@@ -6,11 +6,16 @@
     <title>Super-Dim Probe V5.1 | High-Fidelity Inspection</title>
     <meta name="description" content="High-Fidelity 3D simulation of a cable inspection probe with physics-based fault visualization and Gemini AI diagnostics." />
     
-    <!-- Dynamic Favicon to prevent 404s on static hosting -->
+    <!-- Dynamic Favicon -->
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚡</text></svg>">
 
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Segoe+UI:wght@400;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Polyfill for process.env to prevent crashes in browser environments -->
+    <script>
+      window.process = window.process || { env: { API_KEY: '' } };
+    </script>
     
     <style>
       body {
@@ -18,21 +23,12 @@
         color: #c9d1d9;
         overflow: hidden;
         margin: 0;
-        touch-action: none; /* Prevent scroll on mobile 3D interaction */
+        touch-action: none;
       }
-      /* Custom scrollbar for AI panel */
-      ::-webkit-scrollbar {
-        width: 6px;
-      }
-      ::-webkit-scrollbar-track {
-        background: rgba(0, 0, 0, 0.1);
-      }
-      ::-webkit-scrollbar-thumb {
-        background: rgba(88, 166, 255, 0.3);
-        border-radius: 3px;
-      }
+      ::-webkit-scrollbar { width: 6px; }
+      ::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.1); }
+      ::-webkit-scrollbar-thumb { background: rgba(88, 166, 255, 0.3); border-radius: 3px; }
 
-      /* Native CSS Loader for immediate feedback before React mounts */
       #initial-loader {
         position: fixed;
         inset: 0;
@@ -43,6 +39,7 @@
         background: #020405;
         z-index: 9999;
         font-family: 'JetBrains Mono', monospace;
+        transition: opacity 0.5s ease-out;
       }
       .loader-ring {
         width: 50px;
@@ -64,26 +61,25 @@
   <script type="importmap">
 {
   "imports": {
-    "react/": "https://esm.sh/react@^19.2.3/",
     "react": "https://esm.sh/react@^19.2.3",
     "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "three": "https://esm.sh/three@^0.182.0",
     "@google/genai": "https://esm.sh/@google/genai@^1.34.0",
-    "three/": "https://esm.sh/three@^0.182.0/",
-    "three": "https://esm.sh/three@^0.182.0"
+    "three/": "https://esm.sh/three@^0.182.0/"
   }
 }
 </script>
 </head>
   <body>
     <div id="root">
-      <!-- Content here is replaced by React, but shows during load -->
       <div id="initial-loader">
         <div class="loader-ring"></div>
         <div class="loader-text">INITIALIZING SYSTEM...</div>
       </div>
     </div>
     
-    <!-- IMPORTANT: Use relative path (./) for GitHub Pages subdirectory support -->
+    <!-- Entry point for Vite/Bundlers -->
     <script type="module" src="./index.tsx"></script>
   </body>
 </html>
