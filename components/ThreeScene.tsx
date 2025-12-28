@@ -14,317 +14,225 @@ interface ThreeSceneProps {
 const ThreeScene: React.FC<ThreeSceneProps> = ({ currentMode, isScanning, onSensorUpdate }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
-  
-  // Simulation State Refs
-  const simState = useRef({
-    treeGrowth: 0,
-    jointTemp: 25,
-    mechStress: 0,
-    waterTreeDensity: 0
-  });
+  const sensorGroupRef = useRef<THREE.Group | null>(null);
+  const screenTexRef = useRef<THREE.CanvasTexture | null>(null);
+  const screenCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
-  // Props Ref to access latest state in animation loop without re-triggering effect
   const propsRef = useRef({ currentMode, isScanning, onSensorUpdate });
-  useEffect(() => {
-    propsRef.current = { currentMode, isScanning, onSensorUpdate };
-  }, [currentMode, isScanning, onSensorUpdate]);
+  useEffect(() => { propsRef.current = { currentMode, isScanning, onSensorUpdate }; }, [currentMode, isScanning, onSensorUpdate]);
 
   useEffect(() => {
     if (!containerRef.current) return;
 
-    const width = containerRef.current.clientWidth;
-    const height = containerRef.current.clientHeight;
-    
-    // 1. Setup Scene & Camera
+    // --- SCENE SETUP ---
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x020405);
-    scene.fog = new THREE.FogExp2(0x020405, 0.02);
-    
-    const camera = new THREE.PerspectiveCamera(50, width / height, 0.1, 100);
-    camera.position.set(2.5, 2.8, 4.5);
-    
-    // 2. Setup Renderer
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: "high-performance" });
-    renderer.setSize(width, height);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); 
+    scene.background = new THREE.Color(0x05070a);
+    const camera = new THREE.PerspectiveCamera(35, containerRef.current.clientWidth / containerRef.current.clientHeight, 0.1, 100);
+    camera.position.set(1.8, 1.5, 2.5);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+    renderer.setSize(containerRef.current.clientWidth, containerRef.current.clientHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.outputColorSpace = THREE.SRGBColorSpace;
-    renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.0;
-    
     containerRef.current.appendChild(renderer.domElement);
     rendererRef.current = renderer;
-    
-    // 3. Environment
-    const pmremGenerator = new THREE.PMREMGenerator(renderer);
-    scene.environment = pmremGenerator.fromScene(new RoomEnvironment(), 0.04).texture;
 
-    // 4. Controls
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
-    controls.dampingFactor = 0.05;
 
-    // 5. Lights
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
-    scene.add(ambientLight);
-    
-    const spotLight = new THREE.SpotLight(0xffffff, 1500);
-    spotLight.position.set(5, 8, 5);
-    spotLight.angle = Math.PI / 4;
-    spotLight.penumbra = 0.5;
-    spotLight.castShadow = true;
-    spotLight.shadow.bias = -0.0001;
-    spotLight.shadow.mapSize.width = 2048; 
-    spotLight.shadow.mapSize.height = 2048;
-    scene.add(spotLight);
-    
-    const faultLight = new THREE.PointLight(0x000000, 0, 5);
-    faultLight.position.set(0, 0.5, 0);
-    scene.add(faultLight);
-    
-    const rimLight = new THREE.PointLight(0x58a6ff, 200);
-    rimLight.position.set(-2, 1, -2);
-    scene.add(rimLight);
+    // --- LIGHTING ---
+    const topLight = new THREE.SpotLight(0xffffff, 100);
+    topLight.position.set(0, 5, 0);
+    topLight.castShadow = true;
+    scene.add(topLight);
+    scene.add(new THREE.AmbientLight(0xffffff, 0.4));
 
-    // 6. Environment Objects
-    const grid = new THREE.GridHelper(50, 50, 0x222222, 0x080808);
-    scene.add(grid);
-    
-    const plane = new THREE.Mesh(
-      new THREE.PlaneGeometry(100, 100), 
-      new THREE.MeshStandardMaterial({color: 0x050505, roughness: 0.2, metalness: 0.5})
-    );
-    plane.rotation.x = -Math.PI/2; 
-    plane.position.y = -0.01; 
-    plane.receiveShadow = true;
-    scene.add(plane);
+    // --- REALISTIC CABLE & JOINT ---
+    const cablePath = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(-10, 0, 0),
+      new THREE.Vector3(0, 0, 0),
+      new THREE.Vector3(10, 0, 0)
+    ]);
 
-    // 7. Assets
-    const textures = {
-        metal: TextureFactory.createMetalRoughnessMap(),
-        copper: TextureFactory.createCopperTwistMap(),
-        shield: TextureFactory.createShieldAlphaMap(),
-        pvc: TextureFactory.createPVCBumpMap(),
-        screen: TextureFactory.createScreenGridMap(),
-        tree: TextureFactory.createTreeMap(),
-        waterTree: TextureFactory.createWaterTreeMap(),
-    };
+    // 1. Core Cable Jacket
+    const jacketMat = new THREE.MeshStandardMaterial({ 
+      color: 0x111111, roughness: 0.8, map: TextureFactory.createJacketTexture() 
+    });
+    jacketMat.map!.repeat.set(20, 1);
+    const mainCable = new THREE.Mesh(new THREE.TubeGeometry(cablePath, 128, 0.18, 32, false), jacketMat);
+    scene.add(mainCable);
 
-    // 8. Cable Construction (High Poly)
-    const cableGroup = new THREE.Group(); scene.add(cableGroup);
-    const cablePath = new THREE.CatmullRomCurve3([new THREE.Vector3(-4, 0.2, 0), new THREE.Vector3(-1.5, 0.2, 0.5), new THREE.Vector3(1.5, 0.2, -0.5), new THREE.Vector3(4, 0.2, 0)]);
-    
-    const segments = 400; 
-    const radialSegments = 48;
-    const frames = cablePath.computeFrenetFrames(segments, false);
-    
-    const jacket = new THREE.Mesh(
-      new THREE.TubeGeometry(cablePath, segments, 0.25, radialSegments, false), 
-      new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.8, bumpMap: textures.pvc, bumpScale: 0.02, metalness: 0.1, transparent: true, opacity: 0.95 })
-    );
-    jacket.castShadow = true; jacket.receiveShadow = true; cableGroup.add(jacket);
-    
-    const shield = new THREE.Mesh(
-      new THREE.TubeGeometry(cablePath, segments, 0.22, radialSegments, false), 
-      new THREE.MeshStandardMaterial({ color: 0xaaaaaa, alphaMap: textures.shield, alphaTest: 0.3, transparent: true, side: THREE.DoubleSide, metalness: 0.9 })
-    );
-    textures.shield.repeat.set(50, 2); cableGroup.add(shield);
-    
-    const insulationMeshes: THREE.Mesh[] = [];
-    const phases = [0, 2.09, 4.18]; const phaseColors = [0xff0000, 0xffff00, 0x0044ff];
-    phases.forEach((p, idx) => {
-        const pts = [];
-        for(let i=0; i<=segments; i++) {
-            const u = i/segments; const pos = cablePath.getPointAt(u); const N = frames.normals[i]; const B = frames.binormals[i];
-            const angle = p + u * Math.PI * 10;
-            const vx = (N.x*Math.cos(angle)+B.x*Math.sin(angle))*0.1;
-            const vy = (N.y*Math.cos(angle)+B.y*Math.sin(angle))*0.1;
-            const vz = (N.z*Math.cos(angle)+B.z*Math.sin(angle))*0.1;
-            pos.add(new THREE.Vector3(vx,vy,vz)); pts.push(pos);
-        }
-        const subPath = new THREE.CatmullRomCurve3(pts);
-        const m = new THREE.MeshPhysicalMaterial({ color: phaseColors[idx], transmission: 0.4, opacity: 0.9, transparent: true, roughness: 0.2, metalness: 0, thickness: 0.5 });
-        const tube = new THREE.Mesh(new THREE.TubeGeometry(subPath, segments, 0.06, 16, false), m);
-        cableGroup.add(tube); insulationMeshes.push(tube);
-        
-        const coreMat = new THREE.MeshStandardMaterial({ map: textures.copper, color: 0xffffff, metalness: 0.9, roughness: 0.4 });
-        if(coreMat.map) {
-            coreMat.map.repeat.set(1, 40); coreMat.map.wrapS = THREE.ClampToEdgeWrapping; coreMat.map.wrapT = THREE.RepeatWrapping;
-        }
-        cableGroup.add(new THREE.Mesh(new THREE.TubeGeometry(subPath, segments, 0.025, 12, false), coreMat));
+    // 2. The Joint (Connection area - slightly thicker)
+    const jointGeo = new THREE.CylinderGeometry(0.24, 0.24, 0.8, 48);
+    const jointMat = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.4, metalness: 0.1 });
+    const joint = new THREE.Mesh(jointGeo, jointMat);
+    joint.rotation.z = Math.PI / 2;
+    scene.add(joint);
+
+    // --- ADVANCED SENSOR (JOINT SENTRY V6) ---
+    const sensorGroup = new THREE.Group();
+    scene.add(sensorGroup);
+    sensorGroupRef.current = sensorGroup;
+
+    const frameMat = new THREE.MeshStandardMaterial({ 
+      color: 0x2a2a2a, metalness: 0.9, roughness: 0.2, map: TextureFactory.createMetalRoughnessMap() 
     });
 
-    // 9. Probe Construction
-    const probeGroup = new THREE.Group(); scene.add(probeGroup);
-    
-    const bodyMat = new THREE.MeshStandardMaterial({color:0x2c2c2c, roughness:0.4, metalness:0.8, map: textures.metal});
-    const bodyGeo = new THREE.BoxGeometry(0.3, 0.35, 0.75);
-    const body = new THREE.Mesh(bodyGeo, bodyMat);
-    body.position.y = 0.8; body.castShadow = true; probeGroup.add(body);
-    
-    // Screws
-    const screwGeo = new THREE.CylinderGeometry(0.015, 0.015, 0.02, 6);
-    const screwMat = new THREE.MeshStandardMaterial({color: 0x888888, metalness: 1.0, roughness: 0.3});
-    const screwPositions = [
-      [0.13, 0.15, 0.35], [-0.13, 0.15, 0.35], [0.13, -0.15, 0.35], [-0.13, -0.15, 0.35],
-      [0.13, 0.15, -0.35], [-0.13, 0.15, -0.35], [0.13, -0.15, -0.35], [-0.13, -0.15, -0.35]
-    ];
-    screwPositions.forEach(pos => {
-      const screw = new THREE.Mesh(screwGeo, screwMat);
-      screw.rotation.x = Math.PI / 2;
-      screw.position.set(pos[0], pos[1] + 0.8, pos[2]);
-      probeGroup.add(screw);
+    // Main Collar Body (Hexagonal Industrial Shape)
+    const collarGeo = new THREE.CylinderGeometry(0.38, 0.38, 0.5, 6, 1, false);
+    const collar = new THREE.Mesh(collarGeo, frameMat);
+    collar.rotation.z = Math.PI/2;
+    sensorGroup.add(collar);
+
+    // Transparent Inspect Window
+    const glassMat = new THREE.MeshPhysicalMaterial({ transmission: 0.95, opacity: 0.2, transparent: true, thickness: 0.05 });
+    const windowMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.385, 0.385, 0.12, 32, 1, true), glassMat);
+    windowMesh.rotation.z = Math.PI/2;
+    sensorGroup.add(windowMesh);
+
+    // Ergonomic Display Console (Tilted)
+    const consoleGroup = new THREE.Group();
+    consoleGroup.position.set(0, 0.35, 0);
+    consoleGroup.rotation.x = -Math.PI / 12; // 15-degree tilt
+    sensorGroup.add(consoleGroup);
+
+    const consoleBase = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.12, 0.3), frameMat);
+    consoleGroup.add(consoleBase);
+
+    // Curved Screen Integration
+    const canvas = document.createElement('canvas');
+    canvas.width = 512; canvas.height = 256;
+    screenCanvasRef.current = canvas;
+    const screenTex = new THREE.CanvasTexture(canvas);
+    screenTexRef.current = screenTex;
+
+    const screenMesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.3, 0.2), 
+      new THREE.MeshBasicMaterial({ map: screenTex })
+    );
+    screenMesh.position.set(0, 0.065, 0.02);
+    screenMesh.rotation.x = -Math.PI / 2;
+    consoleGroup.add(screenMesh);
+
+    // Physical Buttons
+    const btnGeo = new THREE.BoxGeometry(0.04, 0.01, 0.02);
+    const btnMat = new THREE.MeshStandardMaterial({ color: 0x444444, emissive: 0x00ffff, emissiveIntensity: 0.5 });
+    for(let i=-1; i<=1; i++) {
+        const btn = new THREE.Mesh(btnGeo, btnMat);
+        btn.position.set(i*0.06, 0.065, 0.12);
+        btn.rotation.x = -Math.PI/2;
+        consoleGroup.add(btn);
+    }
+
+    // Cooling Fins (Sides)
+    const finGeo = new THREE.BoxGeometry(0.4, 0.01, 0.15);
+    for(let i=0; i<5; i++) {
+        const finL = new THREE.Mesh(finGeo, frameMat);
+        finL.position.set(0, (i-2)*0.03, -0.32);
+        sensorGroup.add(finL);
+        const finR = new THREE.Mesh(finGeo, frameMat);
+        finR.position.set(0, (i-2)*0.03, 0.32);
+        sensorGroup.add(finR);
+    }
+
+    // Heavy Duty Locking Bolts
+    const boltGeo = new THREE.CylinderGeometry(0.015, 0.015, 0.04, 6);
+    const boltMat = new THREE.MeshStandardMaterial({ color: 0x888888, metalness: 1 });
+    const boltPos = [[0.18, 0.32], [0.18, -0.32], [-0.18, 0.32], [-0.18, -0.32]];
+    boltPos.forEach(p => {
+        const b = new THREE.Mesh(boltGeo, boltMat);
+        b.position.set(p[0], 0, p[1]);
+        sensorGroup.add(b);
     });
 
-    // Vents
-    const ventGeo = new THREE.BoxGeometry(0.01, 0.02, 0.4);
-    const ventMat = new THREE.MeshStandardMaterial({color: 0x111111, roughness: 0.8});
-    for(let i=0; i<3; i++) {
-       const vL = new THREE.Mesh(ventGeo, ventMat); vL.position.set(-0.152, 0.8 + (i-1)*0.06, 0); probeGroup.add(vL);
-       const vR = new THREE.Mesh(ventGeo, ventMat); vR.position.set(0.152, 0.8 + (i-1)*0.06, 0); probeGroup.add(vR);
-    }
+    // --- FAULT VISUALS ---
+    const thermalGlow = new THREE.PointLight(0xff3300, 0, 1.0);
+    thermalGlow.position.set(0,0,0);
+    scene.add(thermalGlow);
 
-    const gripGroup = new THREE.Group(); gripGroup.position.set(0, 0.55, 0.1); gripGroup.rotation.x = Math.PI / 10; probeGroup.add(gripGroup);
-    const grip = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, 0.55, 32), new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.9, bumpMap: textures.pvc, bumpScale: 0.05 })); gripGroup.add(grip);
-    for(let i=-3; i<=3; i++) {
-        if(Math.abs(i) < 2) continue;
-        const rib = new THREE.Mesh(new THREE.TorusGeometry(0.08, 0.005, 8, 32), new THREE.MeshStandardMaterial({color: 0x000000, roughness: 1}));
-        rib.rotation.x = Math.PI/2; rib.position.y = i * 0.06; gripGroup.add(rib);
-    }
-
-    const trigger = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.12, 0.08), new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.8, metalness: 0.5 })); trigger.position.set(0, 0.15, -0.12); gripGroup.add(trigger);
-
-    const screenHolder = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.28, 0.05), new THREE.MeshStandardMaterial({color:0x2c2c2c, roughness:0.4, metalness:0.8})); screenHolder.position.set(0, 0.98, 0.35); screenHolder.rotation.x = -Math.PI / 3.5; probeGroup.add(screenHolder);
-    const bumper = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, 0.04), new THREE.MeshStandardMaterial({color:0x111111, roughness: 0.9})); bumper.position.z = -0.01; screenHolder.add(bumper);
-    const screen = new THREE.Mesh(new THREE.PlaneGeometry(0.24, 0.24), new THREE.MeshBasicMaterial({ map: textures.screen, color: 0x00ff00 })); screen.position.z = 0.03; screenHolder.add(screen);
-
-    const headGroup = new THREE.Group(); headGroup.position.set(0, 0.8, -0.38); probeGroup.add(headGroup);
-    const base = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.1, 48), new THREE.MeshStandardMaterial({color:0x2c2c2c, roughness:0.4, metalness:0.8})); base.rotation.x = Math.PI/2; headGroup.add(base);
-    const emitterGeo = new THREE.CylinderGeometry(0.025, 0.025, 0.02, 16);
-    const emitterMat = new THREE.MeshStandardMaterial({color: 0x888888, metalness: 0.5, roughness: 0.2});
-    [[0,0], [0.06, 0], [-0.06, 0], [0.03, 0.05], [-0.03, 0.05], [0.03, -0.05], [-0.03, -0.05]].forEach(pos => {
-        const em = new THREE.Mesh(emitterGeo, emitterMat); em.rotation.x = Math.PI/2; em.position.set(pos[0], pos[1], -0.05); headGroup.add(em);
+    const treeMat = new THREE.MeshBasicMaterial({ 
+      map: TextureFactory.createTreeMap(), transparent: true, opacity: 0, blending: THREE.AdditiveBlending 
     });
-    const coil = new THREE.Mesh(new THREE.TorusGeometry(0.22, 0.02, 16, 64), new THREE.MeshStandardMaterial({color:0xcc5500, metalness: 0.8})); headGroup.add(coil);
-    const lensHousing = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 0.1), new THREE.MeshStandardMaterial({color:0x2c2c2c, roughness:0.4, metalness:0.8})); lensHousing.position.set(0, -0.25, 0); headGroup.add(lensHousing);
-    const lens = new THREE.Mesh(new THREE.SphereGeometry(0.04, 32, 32), new THREE.MeshPhysicalMaterial({ color: 0x220000, transmission: 0.9, opacity: 1, roughness: 0, metalness: 0.5 })); lens.position.set(0, -0.25, -0.05); headGroup.add(lens);
+    const tree = new THREE.Mesh(new THREE.PlaneGeometry(0.4, 0.4), treeMat);
+    tree.rotation.y = Math.PI/2;
+    scene.add(tree);
 
-    const coneGeo = new THREE.ConeGeometry(0.4, 1.2, 64, 1, true); coneGeo.translate(0, -0.6, 0);
-    const coneMat = new THREE.MeshBasicMaterial({ color: 0x00ff00, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false });
-    const scanCone = new THREE.Mesh(coneGeo, coneMat); scanCone.position.set(0, 0.8, -0.4); scanCone.rotation.x = -Math.PI/2; probeGroup.add(scanCone);
-
-    // 10. Faults
-    const pdGroup = new THREE.Group(); pdGroup.position.copy(cablePath.getPointAt(0.3));
-    const treePlane = new THREE.Mesh(new THREE.PlaneGeometry(0.3, 0.3), new THREE.MeshBasicMaterial({ map: textures.tree, transparent: true, opacity: 0, color: 0x00ffff, side: THREE.DoubleSide, blending: THREE.AdditiveBlending }));
-    treePlane.rotation.y = Math.PI/2; pdGroup.add(treePlane); pdGroup.add(treePlane.clone().rotateX(Math.PI/2)); scene.add(pdGroup);
-    
-    const mechGroup = new THREE.Group(); mechGroup.position.copy(cablePath.getPointAt(0.7));
-    const scar = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.26, 0.2, 32, 1, true), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1.0, metalness: 0.0, transparent: true, opacity: 0 }));
-    scar.rotation.z = Math.PI/2; scar.scale.set(1, 0.8, 1); mechGroup.add(scar); scene.add(mechGroup);
-    const fiberPulse = new THREE.Mesh(new THREE.SphereGeometry(0.04, 16, 16), new THREE.MeshBasicMaterial({color:0x00ff00})); scene.add(fiberPulse); fiberPulse.visible = false;
-    
-    const jointGroup = new THREE.Group(); jointGroup.position.copy(cablePath.getPointAt(0.5)); jointGroup.lookAt(jointGroup.position.clone().add(cablePath.getTangentAt(0.5)));
-    const jBody = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.6, 32), new THREE.MeshStandardMaterial({color:0x333333})); jBody.rotation.x = Math.PI/2; jointGroup.add(jBody);
-    const flangeGeo = new THREE.CylinderGeometry(0.35, 0.35, 0.05, 32); const flangeMat = new THREE.MeshStandardMaterial({color:0x555555, metalness:0.8, roughness: 0.5});
-    const f1 = new THREE.Mesh(flangeGeo, flangeMat); f1.rotation.x = Math.PI/2; f1.position.z = 0.28; jointGroup.add(f1);
-    const f2 = new THREE.Mesh(flangeGeo, flangeMat); f2.rotation.x = Math.PI/2; f2.position.z = -0.28; jointGroup.add(f2);
-    const boltGeo = new THREE.CylinderGeometry(0.015, 0.015, 0.03, 6); const boltMat = new THREE.MeshStandardMaterial({color: 0x999999, metalness: 1.0});
-    for(let i=0; i<8; i++) {
-        const angle = (i / 8) * Math.PI * 2; const bx = Math.cos(angle) * 0.31; const by = Math.sin(angle) * 0.31;
-        const b1 = new THREE.Mesh(boltGeo, boltMat); b1.rotation.x = Math.PI/2; b1.position.set(bx, by, 0.31); jointGroup.add(b1);
-        const b2 = new THREE.Mesh(boltGeo, boltMat); b2.rotation.x = Math.PI/2; b2.position.set(bx, by, -0.31); jointGroup.add(b2);
-    }
-    scene.add(jointGroup);
-
-    // 11. Animation
+    // --- ANIMATION ---
     const clock = new THREE.Clock();
-    let frameId = 0;
     const animate = () => {
-      frameId = requestAnimationFrame(animate);
-      const dt = clock.getDelta(); const time = clock.getElapsedTime();
-      const { currentMode, isScanning, onSensorUpdate } = propsRef.current;
-      const targetPos = MODES.find(m => m.id === currentMode)?.targetPos ?? -1;
-      const colorHex = MODES.find(m => m.id === currentMode)?.color ?? "#ffffff";
+      requestAnimationFrame(animate);
+      const time = clock.getElapsedTime();
+      const { currentMode, onSensorUpdate } = propsRef.current;
 
-      let t = (Math.sin(time * 0.5) + 1) / 2; if (!isScanning) t = 0.5;
-      const pos = cablePath.getPointAt(t); const tan = cablePath.getTangentAt(t);
-      probeGroup.position.lerp(new THREE.Vector3(pos.x, pos.y + 0.55, pos.z), 0.1); probeGroup.lookAt(pos.clone().add(tan));
-
-      scanCone.material.opacity = (Math.sin(time * 8) + 1) / 2 * 0.2; scanCone.material.color.set(colorHex);
-
-      const dist = Math.abs(t - targetPos);
-      let pdVal = 10 + Math.random() * 5; let tempVal = 25 + Math.random() * 0.5; let vibVal = 0.02 + Math.random() * 0.01; let lossVal = 0.05;
-
-      if (currentMode === FaultMode.XLPE_TREEING) {
-        if (dist < 0.05) {
-            simState.current.treeGrowth = Math.min(1, simState.current.treeGrowth + dt * 0.5);
-            treePlane.material.opacity = simState.current.treeGrowth * (0.5 + Math.random() * 0.5);
-            treePlane.scale.setScalar(0.5 + simState.current.treeGrowth * 0.5);
-            pdVal = 200 + simState.current.treeGrowth * 1500 + Math.random() * 300;
-            faultLight.color.setHex(0x00ffff); faultLight.intensity = simState.current.treeGrowth * 800 * Math.random(); 
-        } else { treePlane.material.opacity = 0; faultLight.intensity = 0; }
-      } else { treePlane.material.opacity = 0; simState.current.treeGrowth = 0; }
-
-      if (currentMode === FaultMode.PVC_DAMAGE) {
-          if (dist < 0.05) {
-            simState.current.mechStress = Math.min(1, simState.current.mechStress + dt * 1.0);
-            scar.material.opacity = simState.current.mechStress * 0.9;
-            vibVal = 0.5 + simState.current.mechStress * 2.5 + Math.random() * 0.5;
-            fiberPulse.visible = true; fiberPulse.position.copy(cablePath.getPointAt(0.6 + (time * 2) % 1 * 0.2));
-          } else { scar.material.opacity = 0; fiberPulse.visible = false; }
-      } else { scar.material.opacity = 0; fiberPulse.visible = false; simState.current.mechStress = 0; }
+      // Logic for telemetry
+      let v = 110.5 + Math.random()*0.2;
+      let a = 428.1 + Math.random()*1.5;
+      let t = 26.2 + Math.random()*0.4;
+      let health = 99.7;
 
       if (currentMode === FaultMode.JOINT_OVERHEAT) {
-          if (dist < 0.05) {
-              const T_max = 120; simState.current.jointTemp = simState.current.jointTemp + (T_max - simState.current.jointTemp) * dt * 0.8;
-              tempVal = simState.current.jointTemp;
-              if (tempVal > 80) {
-                  const ratio = (tempVal - 80) / 40; jBody.material.emissive.setHSL(0.05, 1, ratio * 0.6);
-                  faultLight.color.setHex(0xffaa00); faultLight.intensity = ratio * 500; 
-              } else { jBody.material.emissive.setHex(0); faultLight.intensity = 0; }
-          } else { jBody.material.emissive.setHex(0); if (currentMode === FaultMode.JOINT_OVERHEAT) faultLight.intensity = 0; }
-      } else { jBody.material.emissive.setHex(0); simState.current.jointTemp = 25; }
+          t = 75 + Math.sin(time)*20;
+          thermalGlow.intensity = (t-30)/15;
+          health = 45;
+      } else { thermalGlow.intensity = 0; }
 
-      if (currentMode === FaultMode.WATER_TREEING) {
-          simState.current.waterTreeDensity = 0.5 + Math.sin(time) * 0.1; lossVal = 0.5 + simState.current.waterTreeDensity * 2.0;
-          insulationMeshes.forEach(m => {
-              const mat = m.material as THREE.MeshPhysicalMaterial; mat.map = textures.waterTree; mat.color.setHex(0xaaaaaa); mat.transmission = 0.2; mat.opacity = 0.8 + simState.current.waterTreeDensity * 0.2;
-          });
-          jacket.material.color.setHex(0x222244);
-      } else {
-          simState.current.waterTreeDensity = 0; jacket.material.color.setHex(0x111111);
-          insulationMeshes.forEach((m, i) => {
-              const mat = m.material as THREE.MeshPhysicalMaterial; mat.map = null; mat.color.setHex(phaseColors[i]); mat.transmission = 0.4; mat.opacity = 0.9;
-          });
+      if (currentMode === FaultMode.XLPE_TREEING) {
+          tree.material.opacity = 0.4 + Math.sin(time*12)*0.4;
+          health = 68;
+      } else { tree.material.opacity = 0; }
+
+      // Update Screen
+      const ctx = screenCanvasRef.current?.getContext('2d');
+      if (ctx && screenTexRef.current) {
+        ctx.fillStyle = '#010810'; ctx.fillRect(0,0,512,256);
+        ctx.strokeStyle = '#00f3ff'; ctx.lineWidth = 6; ctx.strokeRect(10,10,492,236);
+        
+        ctx.fillStyle = '#00f3ff';
+        ctx.font = 'bold 36px JetBrains Mono';
+        ctx.fillText('JOINT SENTRY V6.1', 40, 70);
+        
+        ctx.font = '28px JetBrains Mono';
+        ctx.fillText(`TEMP: ${t.toFixed(1)}°C`, 40, 125);
+        ctx.fillText(`LOAD: ${a.toFixed(1)}A`, 40, 175);
+        
+        const color = health > 90 ? '#00ff00' : (health > 50 ? '#ffcc00' : '#ff3300');
+        ctx.fillStyle = color;
+        ctx.fillText(`HEALTH: ${health.toFixed(1)}%`, 40, 225);
+        
+        // Dynamic scan line
+        ctx.strokeStyle = '#00f3ff44';
+        const scanY = (time * 100) % 230 + 15;
+        ctx.beginPath(); ctx.moveTo(20, scanY); ctx.lineTo(492, scanY); ctx.stroke();
+        
+        screenTexRef.current.needsUpdate = true;
       }
-
-      if(currentMode !== FaultMode.XLPE_TREEING && currentMode !== FaultMode.JOINT_OVERHEAT) faultLight.intensity = 0;
 
       controls.update();
       renderer.render(scene, camera);
-      if (renderer.info.render.frame % 5 === 0) onSensorUpdate({ pd: pdVal, temp: tempVal, vib: vibVal, loss: lossVal });
+      
+      if (renderer.info.render.frame % 10 === 0) {
+        onSensorUpdate({ pd: 0, temp: t, vib: 0, loss: 0, voltage: v, current: a });
+      }
     };
-    
     animate();
 
     const handleResize = () => {
-        if (!containerRef.current) return;
-        const w = containerRef.current.clientWidth; const h = containerRef.current.clientHeight;
-        camera.aspect = w / h; camera.updateProjectionMatrix(); renderer.setSize(w, h);
+      camera.aspect = containerRef.current!.clientWidth / containerRef.current!.clientHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(containerRef.current!.clientWidth, containerRef.current!.clientHeight);
     };
     window.addEventListener('resize', handleResize);
-
     return () => {
-        window.removeEventListener('resize', handleResize);
-        cancelAnimationFrame(frameId);
-        renderer.dispose();
-        pmremGenerator.dispose();
-        if (containerRef.current && renderer.domElement) containerRef.current.removeChild(renderer.domElement);
+      window.removeEventListener('resize', handleResize);
+      renderer.dispose();
     };
   }, []);
 
-  return <div ref={containerRef} className="w-full h-full block" />;
+  return <div ref={containerRef} className="w-full h-full" />;
 };
 
 export default ThreeScene;

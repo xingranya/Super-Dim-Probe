@@ -1,109 +1,67 @@
-import React, { useEffect, useRef } from 'react';
-import { SensorData, FaultMode } from '../types';
+import React from 'react';
+import { SensorData, FaultMode, MODES } from '../types';
 
 interface HUDProps {
   data: SensorData;
   mode: FaultMode;
 }
 
-const SensorItem: React.FC<{ label: string; value: string; unit: string; active?: boolean }> = ({ label, value, unit, active }) => (
-  <div className={`p-2.5 rounded-sm flex flex-col border-l-2 transition-all duration-300 ${active ? 'bg-gradient-to-r from-blue-500/10 to-transparent border-blue-400' : 'bg-black/30 border-transparent'}`}>
-    <span className="text-gray-400 text-[10px] font-medium mb-1 uppercase tracking-wider">{label}</span>
-    <div className="flex items-baseline">
-      <span className="text-gray-100 font-bold font-mono text-sm">{value}</span>
-      <span className="text-gray-500 text-[10px] ml-1">{unit}</span>
+const TelemetryItem: React.FC<{ label: string; value: string; unit: string; alert?: boolean }> = ({ label, value, unit, alert }) => (
+  <div className={`bg-slate-900/60 border-r-2 ${alert ? 'border-red-500 bg-red-950/20' : 'border-cyan-500'} p-4 backdrop-blur-md transition-colors duration-500`}>
+    <div className="text-[10px] text-cyan-400 font-black uppercase tracking-[0.2em] mb-1">{label}</div>
+    <div className="flex items-baseline gap-2">
+      <span className="text-3xl font-mono font-bold text-white tabular-nums tracking-tighter">{value}</span>
+      <span className="text-xs text-slate-500 font-bold">{unit}</span>
     </div>
   </div>
 );
 
 const HUD: React.FC<HUDProps> = ({ data, mode }) => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  
-  // Spectrum visualizer loop
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    let frameId = 0;
-    const draw = () => {
-      frameId = requestAnimationFrame(draw);
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      
-      const bars = 40;
-      const barWidth = canvas.width / bars;
-      
-      ctx.fillStyle = '#58a6ff';
-      ctx.globalAlpha = 0.5;
-      
-      for (let i = 0; i < bars; i++) {
-        let h = Math.random() * 10;
-        
-        // Dynamic spectrum based on mode and simulated "signal"
-        if (mode === FaultMode.XLPE_TREEING && data.pd > 100) {
-           h = Math.random() * 40; 
-        } else if (mode === FaultMode.PVC_DAMAGE) {
-           const time = Date.now() / 1000;
-           h = (Math.sin(i * 0.5 + time * 10) * 0.5 + 0.5) * 30 + 5;
-        }
-
-        const x = i * barWidth;
-        const y = canvas.height - h;
-        ctx.fillRect(x, y, barWidth - 1, h);
-      }
-    };
-    
-    draw();
-    return () => cancelAnimationFrame(frameId);
-  }, [mode, data.pd]); // Re-bind if mode drastically changes pattern logic
+  const currentMode = MODES.find(m => m.id === mode);
+  const isAlert = data.temp > 80 || (mode === FaultMode.XLPE_TREEING);
 
   return (
-    <div className="absolute top-6 left-6 w-[380px] bg-[#0c1018]/90 border border-blue-400/20 border-l-4 border-l-blue-500 p-6 rounded-sm backdrop-blur-md shadow-2xl z-10 select-none pointer-events-none">
-      <h2 className="text-white text-xl font-extrabold tracking-widest m-0 mb-1">SUPER-DIM PROBE</h2>
-      <div className="flex justify-between border-b border-white/10 pb-2.5 mb-5 text-[10px] font-semibold text-gray-500 uppercase">
-        <span>Engineering Simulation Unit</span>
-        <span className="text-green-500">System Normal</span>
+    <div className="absolute inset-0 pointer-events-none p-10 flex flex-col justify-between">
+      {/* Upper Dashboard */}
+      <div className="flex justify-between items-start">
+        <div className="bg-black/80 p-6 border-l-4 border-cyan-500 backdrop-blur-xl">
+          <div className="flex items-center gap-4 mb-2">
+            <div className={`w-3 h-3 rounded-full ${isAlert ? 'bg-red-500 animate-ping' : 'bg-cyan-500'}`} />
+            <h1 className="text-white text-3xl font-black tracking-tighter uppercase leading-none">Node-09 Joint Sentry</h1>
+          </div>
+          <div className="text-[10px] text-slate-400 font-mono tracking-[0.3em] uppercase">
+            Station: High-Voltage Sub / Rack: A-12 / Protocol: MQTT-Over-Secure
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4 w-96">
+          <TelemetryItem label="Joint Temperature" value={data.temp.toFixed(1)} unit="°C" alert={data.temp > 80} />
+          <TelemetryItem label="Active Load" value={data.current.toFixed(1)} unit="Amps" />
+          <TelemetryItem label="Grid Voltage" value={data.voltage.toFixed(1)} unit="kV" />
+          <TelemetryItem label="Phase Angle" value="120.0" unit="DEG" />
+        </div>
       </div>
 
-      {/* Spectrum */}
-      <div className="h-[60px] bg-black/60 border border-white/5 mb-4 relative">
-        <canvas ref={canvasRef} width={330} height={60} className="w-full h-full" />
-      </div>
-
-      {/* Sensor Matrix */}
-      <div className="grid grid-cols-2 gap-2 mb-4">
-        <SensorItem 
-          label="PD Level" 
-          value={data.pd > 100 ? data.pd.toFixed(0) : '--'} 
-          unit="pC" 
-          active={mode === FaultMode.XLPE_TREEING} 
-        />
-        <SensorItem 
-          label="Core Temp" 
-          value={data.temp.toFixed(1)} 
-          unit="°C" 
-          active={mode === FaultMode.JOINT_OVERHEAT} 
-        />
-        <SensorItem 
-          label="Vibration" 
-          value={data.vib.toFixed(2)} 
-          unit="g" 
-          active={mode === FaultMode.PVC_DAMAGE} 
-        />
-        <SensorItem 
-          label="Dielectric Loss" 
-          value={data.loss.toFixed(2)} 
-          unit="%" 
-          active={mode === FaultMode.WATER_TREEING} 
-        />
-      </div>
-
-      <div className="flex justify-between items-center border-t border-white/10 pt-2.5 mt-2.5">
-        <span className="bg-gradient-to-br from-purple-700 to-purple-500 text-white px-2 py-0.5 rounded-full text-[10px] font-bold shadow-lg shadow-purple-500/40">
-          GEMINI AI READY
-        </span>
-        <span className="text-[10px] text-gray-600">IEC 60270 / 60502 COMPLIANT</span>
+      {/* Bottom Status Bar */}
+      <div className="flex justify-between items-end">
+        <div className="flex flex-col gap-4">
+            <div className="bg-cyan-900/20 border-t-2 border-cyan-500 p-6 backdrop-blur-md max-w-sm">
+                <div className="text-cyan-400 text-[10px] font-black uppercase tracking-[0.2em] mb-2">System Diagnostics</div>
+                <div className="text-white text-4xl font-black uppercase tracking-tighter flex items-center gap-4">
+                    <span className="text-5xl drop-shadow-[0_0_15px_rgba(0,255,255,0.5)]">{currentMode?.icon}</span>
+                    {currentMode?.name}
+                </div>
+            </div>
+            <div className="flex gap-4">
+                <div className="px-3 py-1 bg-white/5 border border-white/10 rounded text-[9px] text-white/50 font-bold uppercase tracking-widest">Storage: 94%</div>
+                <div className="px-3 py-1 bg-white/5 border border-white/10 rounded text-[9px] text-white/50 font-bold uppercase tracking-widest">Uptime: 1,420H</div>
+            </div>
+        </div>
+        
+        <div className="text-right">
+            <div className="text-[10px] text-slate-600 font-mono uppercase tracking-[0.1em] mb-1">Authenticated Operator: admin_02</div>
+            <div className="text-[12px] text-slate-500 font-mono tracking-tighter">TIMESTAMP: {new Date().toISOString()}</div>
+        </div>
       </div>
     </div>
   );
