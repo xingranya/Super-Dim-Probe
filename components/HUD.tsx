@@ -21,7 +21,7 @@ const HUD: React.FC<HUDProps> = ({ data, mode }) => {
   const isAlert = data.temp > 80 || (mode === FaultMode.XLPE_TREEING);
 
   return (
-    <div className="absolute inset-0 pointer-events-none p-10 flex flex-col justify-between">
+    <div className="absolute inset-0 pointer-events-none p-10 flex flex-col justify-between z-10">
       {/* Upper Dashboard */}
       <div className="flex justify-between items-start">
         <div className="bg-black/80 p-6 border-l-4 border-cyan-500 backdrop-blur-xl">

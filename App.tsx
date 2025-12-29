@@ -21,21 +21,26 @@ const App: React.FC = () => {
 
   return (
     <div className="relative w-full h-screen bg-[#020305] overflow-hidden font-sans">
-      <ThreeScene 
-        currentMode={currentMode} 
-        isScanning={true} 
-        onSensorUpdate={handleSensorUpdate} 
-      />
+      {/* 3D 场景 - 最底层，z-index: 0 */}
+      <div className="absolute inset-0 z-0">
+        <ThreeScene 
+          currentMode={currentMode} 
+          isScanning={true} 
+          onSensorUpdate={handleSensorUpdate} 
+        />
+      </div>
 
+      {/* HUD 叠加层 - pointer-events-none 确保不阻挡鼠标 */}
       <HUD data={sensorData} mode={currentMode} />
 
+      {/* 控制按钮 - 需要接收点击事件 */}
       <ModeSelector 
         currentMode={currentMode} 
         onModeChange={(mode) => setCurrentMode(mode)} 
       />
 
-      {/* Aesthetic Overlays */}
-      <div className="absolute inset-0 pointer-events-none">
+      {/* 美学渐变叠加层 - pointer-events-none */}
+      <div className="absolute inset-0 pointer-events-none z-20">
         <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-black/50 to-transparent" />
         <div className="absolute bottom-0 left-0 w-full h-32 bg-gradient-to-t from-black/50 to-transparent" />
       </div>
