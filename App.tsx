@@ -2,7 +2,7 @@ import React, { useState, useCallback, useMemo } from 'react';
 import ThreeScene from './components/ThreeScene';
 import HUD from './components/HUD';
 import { ModeSelector } from './components/Controls';
-import PerformanceMonitor from './components/PerformanceMonitor';
+
 import { FaultMode, SensorData } from './types';
 
 const App: React.FC = () => {
@@ -37,8 +37,7 @@ const App: React.FC = () => {
 
   return (
     <div className="relative w-full h-screen bg-[#020305] overflow-hidden font-sans">
-      {/* 性能监控器 - 只在开发模式显示 */}
-      <PerformanceMonitor enabled={process.env.NODE_ENV !== 'production'} />
+
       
       {/* 美学渐变叠加层 - z-1 确保在3D场景之下 */}
       <div className="absolute inset-0 pointer-events-none z-0">

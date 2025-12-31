@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { SensorData, FaultMode, MODES } from '../types';
 
 interface HUDProps {
@@ -16,6 +16,54 @@ const TelemetryItem: React.FC<{ label: string; value: string; unit: string; aler
     </div>
   </div>
 ));
+
+// 性能监控组件
+const PerformanceMonitor: React.FC = React.memo(() => {
+  const [fps, setFps] = useState(60);
+  const [memory, setMemory] = useState(0);
+  
+  useEffect(() => {
+    let frameCount = 0;
+    let lastTime = performance.now();
+    
+    const updateMetrics = () => {
+      frameCount++;
+      const now = performance.now();
+      if (now - lastTime >= 1000) {
+        setFps(Math.round(frameCount * 1000 / (now - lastTime)));
+        frameCount = 0;
+        lastTime = now;
+        
+        // 获取内存使用
+        if ((performance as any).memory) {
+          setMemory(Math.round((performance as any).memory.usedJSHeapSize / 1024 / 1024));
+        }
+      }
+      requestAnimationFrame(updateMetrics);
+    };
+    
+    const animationId = requestAnimationFrame(updateMetrics);
+    return () => cancelAnimationFrame(animationId);
+  }, []);
+  
+  return (
+    <div className="bg-slate-900/80 backdrop-blur-md border border-cyan-500/30 p-4">
+      <div className="text-[10px] text-cyan-400 font-black uppercase tracking-[0.2em] mb-2">Performance</div>
+      <div className="flex gap-4 text-xs font-mono">
+        <div>
+          <span className="text-white font-bold">{fps}</span>
+          <span className="text-cyan-500 ml-1">FPS</span>
+        </div>
+        <div>
+          <span className="text-white font-bold">{memory || '--'}M</span>
+          <span className="text-cyan-500 ml-1">MEM</span>
+        </div>
+      </div>
+      <div className="text-[9px] text-emerald-400 mt-2">✓ Optimal</div>
+    </div>
+  );
+});
+
 const HUD: React.FC<HUDProps> = ({ data, mode }) => {
   const currentMode = useMemo(() => MODES.find(m => m.id === mode), [mode]);
   const isAlert = useMemo(() => data.temp > 80 || (mode === FaultMode.XLPE_TREEING), [data.temp, mode]);
@@ -37,11 +85,14 @@ const HUD: React.FC<HUDProps> = ({ data, mode }) => {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4 w-96">
-          <TelemetryItem label="Joint Temperature" value={data.temp.toFixed(1)} unit="°C" alert={data.temp > 80} />
-          <TelemetryItem label="Active Load" value={data.current.toFixed(1)} unit="Amps" />
-          <TelemetryItem label="Grid Voltage" value={data.voltage.toFixed(1)} unit="kV" />
-          <TelemetryItem label="Phase Angle" value="120.0" unit="DEG" />
+        <div className="flex flex-col gap-4 items-end">
+          <PerformanceMonitor />
+          <div className="grid grid-cols-2 gap-4 w-96">
+            <TelemetryItem label="Joint Temperature" value={data.temp.toFixed(1)} unit="°C" alert={data.temp > 80} />
+            <TelemetryItem label="Active Load" value={data.current.toFixed(1)} unit="Amps" />
+            <TelemetryItem label="Grid Voltage" value={data.voltage.toFixed(1)} unit="kV" />
+            <TelemetryItem label="Phase Angle" value="120.0" unit="DEG" />
+          </div>
         </div>
       </div>
 
@@ -57,7 +108,7 @@ const HUD: React.FC<HUDProps> = ({ data, mode }) => {
             </div>
             <div className="flex gap-4">
                 <div className="px-3 py-1 bg-white/5 border border-white/10 rounded text-[9px] text-white/50 font-bold uppercase tracking-widest">Storage: 94%</div>
-                <div className="px-3 py-1 bg-white/5 border border-white/10 rounded text-[9px] text-white/50 font-bold uppercase tracking-widest">Uptime: 1,420H</div>
+                <div className="px-3 py-1 bg-white/5 border border-white/10 rounded text-[9px] text-white/50 font-bold uppercase tracking-widest">Uptime: 1,428h</div>
             </div>
         </div>
         

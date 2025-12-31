@@ -13,3 +13,11 @@ root.render(
     <App />
   </React.StrictMode>
 );
+
+// 移除初始加载器，避免阻挡鼠标事件
+const loader = document.getElementById('initial-loader');
+if (loader) {
+  loader.style.opacity = '0';
+  loader.style.pointerEvents = 'none';
+  setTimeout(() => loader.remove(), 500);
+}
