@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { FaultMode, MODES } from '../types';
 
 interface ControlsProps {
@@ -6,7 +6,8 @@ interface ControlsProps {
   onModeChange: (mode: FaultMode) => void;
 }
 
-export const ModeSelector: React.FC<ControlsProps> = ({ currentMode, onModeChange }) => {
+// 优化：使用 React.memo 防止不必要的重渲染
+export const ModeSelector: React.FC<ControlsProps> = memo(({ currentMode, onModeChange }) => {
   return (
     <div className="absolute bottom-10 left-1/2 -translate-x-1/2 flex flex-col items-center gap-4 z-10 pointer-events-auto">
       <div className="text-[10px] text-cyan-500/50 font-bold uppercase tracking-[0.3em]">Simulation Scenario Selection</div>
@@ -30,4 +31,4 @@ export const ModeSelector: React.FC<ControlsProps> = ({ currentMode, onModeChang
       </div>
     </div>
   );
-};
+});

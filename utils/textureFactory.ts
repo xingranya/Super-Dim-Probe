@@ -3,7 +3,11 @@ import * as THREE from 'three';
 /**
  * 纹理工厂 - 程序化生成高质量纹理
  * 用于高压电缆接头监测系统的 3D 可视化
+ * 带缓存机制防止重复生成
  */
+
+// 全局纹理缓存，避免内存泄漏和重复生成
+const textureCache = new Map<string, THREE.CanvasTexture>();
 
 const createTexture = (width: number, height: number, drawFn: (ctx: CanvasRenderingContext2D, w: number, h: number) => void): THREE.CanvasTexture => {
   const canvas = document.createElement('canvas');
@@ -17,6 +21,14 @@ const createTexture = (width: number, height: number, drawFn: (ctx: CanvasRender
   return tex;
 };
 
+// 缓存工厂函数
+const getCachedTexture = (key: string, generator: () => THREE.CanvasTexture): THREE.CanvasTexture => {
+  if (!textureCache.has(key)) {
+    textureCache.set(key, generator());
+  }
+  return textureCache.get(key)!;
+};
+
 // ============================================
 // 基础纹理
 // ============================================
@@ -24,7 +36,7 @@ const createTexture = (width: number, height: number, drawFn: (ctx: CanvasRender
 /**
  * 金属粗糙度贴图 - 用于传感器外壳
  */
-export const createMetalRoughnessMap = () => createTexture(512, 512, (ctx, w, h) => {
+export const createMetalRoughnessMap = () => getCachedTexture('metal_roughness', () => createTexture(512, 512, (ctx, w, h) => {
   ctx.fillStyle = '#222'; ctx.fillRect(0, 0, w, h);
   ctx.strokeStyle = '#444'; ctx.lineWidth = 1;
   for (let i = 0; i < 500; i++) {
@@ -32,12 +44,12 @@ export const createMetalRoughnessMap = () => createTexture(512, 512, (ctx, w, h)
     const x = Math.random() * w; const y = Math.random() * h;
     ctx.moveTo(x, y); ctx.lineTo(x + Math.random() * 20, y); ctx.stroke();
   }
-});
+}));
 
 /**
  * 铜导线纹理 - 用于电缆芯线
  */
-export const createCopperStrandMap = () => createTexture(512, 512, (ctx, w, h) => {
+export const createCopperStrandMap = () => getCachedTexture('copper_strand', () => createTexture(512, 512, (ctx, w, h) => {
   // 基础铜色
   const gradient = ctx.createLinearGradient(0, 0, w, h);
   gradient.addColorStop(0, '#b87333');
@@ -65,12 +77,12 @@ export const createCopperStrandMap = () => createTexture(512, 512, (ctx, w, h) =
     ctx.lineTo(i + 34, h);
     ctx.stroke();
   }
-});
+}));
 
 /**
  * 编织层纹理 - 用于屏蔽层
  */
-export const createBraidMap = () => createTexture(256, 256, (ctx, w, h) => {
+export const createBraidMap = () => getCachedTexture('braid', () => createTexture(256, 256, (ctx, w, h) => {
   ctx.fillStyle = '#000'; ctx.fillRect(0, 0, w, h);
   
   // 交叉编织图案
@@ -97,12 +109,12 @@ export const createBraidMap = () => createTexture(256, 256, (ctx, w, h) => {
       ctx.fill();
     }
   }
-});
+}));
 
 /**
  * 电缆外护套纹理 - PVC/PE 材质效果
  */
-export const createJacketTexture = () => createTexture(512, 512, (ctx, w, h) => {
+export const createJacketTexture = () => getCachedTexture('jacket', () => createTexture(512, 512, (ctx, w, h) => {
   // 深色基底
   ctx.fillStyle = '#0a0a0a';
   ctx.fillRect(0, 0, w, h);
@@ -123,12 +135,12 @@ export const createJacketTexture = () => createTexture(512, 512, (ctx, w, h) => 
     ctx.lineTo(i, h);
     ctx.stroke();
   }
-});
+}));
 
 /**
  * 电树纹理 - 用于局部放电可视化
  */
-export const createTreeMap = () => createTexture(512, 512, (ctx, w, h) => {
+export const createTreeMap = () => getCachedTexture('tree', () => createTexture(512, 512, (ctx, w, h) => {
   ctx.clearRect(0, 0, w, h);
   
   ctx.strokeStyle = '#00f2ff';
@@ -159,7 +171,7 @@ export const createTreeMap = () => createTexture(512, 512, (ctx, w, h) => {
   };
   
   drawBranch(w / 2, h / 2, 80, -Math.PI / 2, 7);
-});
+}));
 
 // ============================================
 // 高级纹理 - 用于增强视觉效果
@@ -168,7 +180,7 @@ export const createTreeMap = () => createTexture(512, 512, (ctx, w, h) => {
 /**
  * XLPE 绝缘层纹理 - 半透明微孔效果
  */
-export const createXLPETexture = () => createTexture(512, 512, (ctx, w, h) => {
+export const createXLPETexture = () => getCachedTexture('xlpe', () => createTexture(512, 512, (ctx, w, h) => {
   // 半透明蓝色基底
   ctx.fillStyle = 'rgba(100, 150, 220, 0.6)';
   ctx.fillRect(0, 0, w, h);
@@ -196,12 +208,12 @@ export const createXLPETexture = () => createTexture(512, 512, (ctx, w, h) => {
   gradient.addColorStop(1, 'rgba(255, 255, 255, 0.05)');
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, w, h);
-});
+}));
 
 /**
  * 高光泽铜导体纹理
  */
-export const createHighGlossCopperTexture = () => createTexture(512, 512, (ctx, w, h) => {
+export const createHighGlossCopperTexture = () => getCachedTexture('high_gloss_copper', () => createTexture(512, 512, (ctx, w, h) => {
   // 渐变铜色
   const gradient = ctx.createLinearGradient(0, 0, w, 0);
   gradient.addColorStop(0, '#cd7f32');
@@ -233,12 +245,12 @@ export const createHighGlossCopperTexture = () => createTexture(512, 512, (ctx, 
     ctx.arc(Math.random() * w, Math.random() * h, Math.random() * 5 + 2, 0, Math.PI * 2);
     ctx.fill();
   }
-});
+}));
 
 /**
  * 损伤/碳化纹理 - 用于故障可视化
  */
-export const createDamageTexture = () => createTexture(512, 512, (ctx, w, h) => {
+export const createDamageTexture = () => getCachedTexture('damage', () => createTexture(512, 512, (ctx, w, h) => {
   ctx.clearRect(0, 0, w, h);
   
   // 碳化裂纹
@@ -287,12 +299,12 @@ export const createDamageTexture = () => createTexture(512, 512, (ctx, w, h) => 
     ctx.arc(x, y, 20, 0, Math.PI * 2);
     ctx.fill();
   }
-});
+}));
 
 /**
  * 法线贴图生成 - 用于增强表面细节
  */
-export const createNormalMap = () => createTexture(512, 512, (ctx, w, h) => {
+export const createNormalMap = () => getCachedTexture('normal', () => createTexture(512, 512, (ctx, w, h) => {
   // 中性法线颜色 (128, 128, 255)
   ctx.fillStyle = 'rgb(128, 128, 255)';
   ctx.fillRect(0, 0, w, h);
@@ -309,12 +321,12 @@ export const createNormalMap = () => createTexture(512, 512, (ctx, w, h) => {
   }
   
   ctx.putImageData(imageData, 0, 0);
-});
+}));
 
 /**
  * 水树纹理 - 用于绝缘老化可视化
  */
-export const createWaterTreeTexture = () => createTexture(512, 512, (ctx, w, h) => {
+export const createWaterTreeTexture = () => getCachedTexture('water_tree', () => createTexture(512, 512, (ctx, w, h) => {
   ctx.clearRect(0, 0, w, h);
   
   // 绘制水树状分支
@@ -347,12 +359,20 @@ export const createWaterTreeTexture = () => createTexture(512, 512, (ctx, w, h) 
   };
   
   drawWaterTree(w / 2, h * 0.8, 8, -Math.PI / 2, 6);
-});
+}));
+
+/**
+ * 清理纹理缓存 - 用于释放内存
+ */
+export const clearTextureCache = () => {
+  textureCache.forEach(texture => texture.dispose());
+  textureCache.clear();
+};
 
 /**
  * 能量场纹理 - 用于电场可视化
  */
-export const createEnergyFieldTexture = () => createTexture(512, 512, (ctx, w, h) => {
+export const createEnergyFieldTexture = () => getCachedTexture('energy_field', () => createTexture(512, 512, (ctx, w, h) => {
   ctx.fillStyle = 'rgba(0, 0, 0, 0)';
   ctx.clearRect(0, 0, w, h);
   
@@ -382,4 +402,4 @@ export const createEnergyFieldTexture = () => createTexture(512, 512, (ctx, w, h
     ctx.lineTo(cx + Math.cos(angle) * w, cy + Math.sin(angle) * h);
     ctx.stroke();
   }
-});
+}));

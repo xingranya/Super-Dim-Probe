@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useMemo } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
@@ -19,6 +19,8 @@ const ThreeScene: React.FC<ThreeSceneProps> = ({ currentMode, isScanning, onSens
   const containerRef = useRef<HTMLDivElement>(null);
   const screenTexRef = useRef<THREE.CanvasTexture | null>(null);
   const screenCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const frameCountRef = useRef(0);
+  const lastUpdateTimeRef = useRef(0);
 
   const propsRef = useRef({ currentMode, isScanning, onSensorUpdate });
   useEffect(() => { propsRef.current = { currentMode, isScanning, onSensorUpdate }; }, [currentMode, isScanning, onSensorUpdate]);
@@ -34,10 +36,15 @@ const ThreeScene: React.FC<ThreeSceneProps> = ({ currentMode, isScanning, onSens
     const camera = new THREE.PerspectiveCamera(35, containerRef.current.clientWidth / containerRef.current.clientHeight, 0.1, 100);
     camera.position.set(2.5, 2.0, 3.5);
 
-    // 渲染器
-    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+    // 渲染器 - 优化像素比和性能设置
+    const renderer = new THREE.WebGLRenderer({ 
+      antialias: true, 
+      powerPreference: "high-performance",
+      stencil: false, // 禁用不必要的模板缓冲
+      depth: true
+    });
     renderer.setSize(containerRef.current.clientWidth, containerRef.current.clientHeight);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5)); // 限制像素比提升性能
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -49,10 +56,15 @@ const ThreeScene: React.FC<ThreeSceneProps> = ({ currentMode, isScanning, onSens
     const pmrem = new THREE.PMREMGenerator(renderer);
     scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
 
-    // 后处理
+    // 后处理 - 优化bloom参数减少GPU负载
     const composer = new EffectComposer(renderer);
     composer.addPass(new RenderPass(scene, camera));
-    const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.8, 0.4, 0.85);
+    const bloomPass = new UnrealBloomPass(
+      new THREE.Vector2(window.innerWidth, window.innerHeight), 
+      0.6,  // 降低强度
+      0.3,  // 降低半径
+      0.85
+    );
     composer.addPass(bloomPass);
 
     // OrbitControls
@@ -189,8 +201,8 @@ const ThreeScene: React.FC<ThreeSceneProps> = ({ currentMode, isScanning, onSens
     energyFlow.visible = false;
     scene.add(energyFlow);
 
-    // 粒子
-    const particleCount = 200;
+    // 粒子 - 优化粒子数量
+    const particleCount = 150; // 从200降低到150
     const particleGeo = new THREE.BufferGeometry();
     const positions = new Float32Array(particleCount * 3);
     const colors = new Float32Array(particleCount * 3);
@@ -211,17 +223,21 @@ const ThreeScene: React.FC<ThreeSceneProps> = ({ currentMode, isScanning, onSens
     // 动画
     const clock = new THREE.Clock();
     let animationId: number;
+    const UPDATE_SENSOR_INTERVAL = 15; // 每15帧更新一次传感器
+    const UPDATE_SCREEN_INTERVAL = 10; // 每10帧更新一次屏幕
 
     const animate = () => {
       animationId = requestAnimationFrame(animate);
       const time = clock.getElapsedTime();
       const { currentMode, onSensorUpdate } = propsRef.current;
+      frameCountRef.current++;
 
       let voltage = 110.5 + Math.sin(time * 0.5) * 0.3;
       let current = 428.1 + Math.sin(time * 0.3) * 2;
       let temp = 26.2 + Math.sin(time * 0.1) * 0.5;
       let pd = 0, health = 99.7;
 
+      // 只更新显示的shader uniforms
       thermalMat.uniforms.time.value = time;
       electricTreeMat.uniforms.time.value = time;
       scanWaveMat.uniforms.time.value = time;
@@ -239,7 +255,7 @@ const ThreeScene: React.FC<ThreeSceneProps> = ({ currentMode, isScanning, onSens
           thermalOverlay.visible = true;
           thermalMat.uniforms.temperature.value = Math.min(1, (temp - 26) / 80);
           health = 45;
-          bloomPass.strength = 1.2;
+          bloomPass.strength = 1.0; // 降低bloom强度
           break;
         case FaultMode.XLPE_TREEING:
           electricTree.visible = true;
@@ -247,7 +263,7 @@ const ThreeScene: React.FC<ThreeSceneProps> = ({ currentMode, isScanning, onSens
           electricTreeMat.uniforms.intensity.value = 0.6 + Math.sin(time * 8) * 0.4;
           pd = 150 + Math.sin(time * 10) * 100;
           health = 68;
-          bloomPass.strength = 1.0;
+          bloomPass.strength = 0.8; // 降低bloom强度
           break;
         case FaultMode.PVC_DAMAGE:
           energyFlow.visible = true;
@@ -262,50 +278,63 @@ const ThreeScene: React.FC<ThreeSceneProps> = ({ currentMode, isScanning, onSens
           break;
         default:
           thermalGlow.intensity = 0;
-          bloomPass.strength = 0.8;
+          bloomPass.strength = 0.6; // 降低bloom强度
       }
 
-      // 更新粒子
+      // 更新粒子 - 仅在可见时更新
       if (particles.visible) {
         const pos = particleGeo.attributes.position.array as Float32Array;
         for (let i = 0; i < particleCount; i++) {
           pos[i * 3] += velocities[i].x;
           pos[i * 3 + 1] += velocities[i].y;
           pos[i * 3 + 2] += velocities[i].z;
-          if (pos[i * 3 + 1] > 0.8) { pos[i * 3] = (Math.random() - 0.5) * 0.3; pos[i * 3 + 1] = 0; pos[i * 3 + 2] = (Math.random() - 0.5) * 0.3; }
+          if (pos[i * 3 + 1] > 0.8) { 
+            pos[i * 3] = (Math.random() - 0.5) * 0.3; 
+            pos[i * 3 + 1] = 0; 
+            pos[i * 3 + 2] = (Math.random() - 0.5) * 0.3; 
+          }
         }
         particleGeo.attributes.position.needsUpdate = true;
       }
 
-      // LED呼吸
-      sensorGroup.children.forEach((c, i) => {
-        if (c instanceof THREE.Mesh && c.material instanceof THREE.MeshBasicMaterial && c.geometry instanceof THREE.SphereGeometry) {
-          c.material.opacity = 0.5 + Math.sin(time * 3 + i) * 0.5;
+      // LED呼吸 - 优化更新频率
+      if (frameCountRef.current % 3 === 0) {
+        sensorGroup.children.forEach((c, i) => {
+          if (c instanceof THREE.Mesh && c.material instanceof THREE.MeshBasicMaterial && c.geometry instanceof THREE.SphereGeometry) {
+            c.material.opacity = 0.5 + Math.sin(time * 3 + i) * 0.5;
+          }
+        });
+      }
+
+      // 天线闪烁 - 优化更新频率
+      if (frameCountRef.current % 3 === 0 && antennaTip.material instanceof THREE.MeshBasicMaterial) {
+        antennaTip.material.opacity = 0.5 + Math.sin(time * 5) * 0.5;
+      }
+
+      // 屏幕更新 - 降低更新频率从每帧到每10帧
+      if (frameCountRef.current % UPDATE_SCREEN_INTERVAL === 0) {
+        const ctx = screenCanvasRef.current?.getContext('2d');
+        if (ctx && screenTexRef.current) {
+          ctx.fillStyle = '#010810'; ctx.fillRect(0, 0, 512, 256);
+          ctx.strokeStyle = '#00f3ff'; ctx.lineWidth = 4; ctx.strokeRect(6, 6, 500, 244);
+          ctx.fillStyle = '#00f3ff'; ctx.font = 'bold 28px monospace'; ctx.fillText('JOINT SENTRY V6.1', 30, 45);
+          ctx.font = '22px monospace'; ctx.fillStyle = '#88ccff';
+          ctx.fillText(`TEMP: ${temp.toFixed(1)}°C`, 30, 100);
+          ctx.fillText(`LOAD: ${current.toFixed(1)}A`, 30, 135);
+          ctx.fillText(`VOLT: ${voltage.toFixed(1)}kV`, 30, 170);
+          const hc = health > 90 ? '#00ff00' : health > 50 ? '#ffcc00' : '#ff3300';
+          ctx.fillStyle = hc; ctx.font = 'bold 26px monospace'; ctx.fillText(`HEALTH: ${health.toFixed(1)}%`, 30, 215);
+          screenTexRef.current.needsUpdate = true;
         }
-      });
-
-      // 天线闪烁
-      if (antennaTip.material instanceof THREE.MeshBasicMaterial) antennaTip.material.opacity = 0.5 + Math.sin(time * 5) * 0.5;
-
-      // 屏幕更新
-      const ctx = screenCanvasRef.current?.getContext('2d');
-      if (ctx && screenTexRef.current) {
-        ctx.fillStyle = '#010810'; ctx.fillRect(0, 0, 512, 256);
-        ctx.strokeStyle = '#00f3ff'; ctx.lineWidth = 4; ctx.strokeRect(6, 6, 500, 244);
-        ctx.fillStyle = '#00f3ff'; ctx.font = 'bold 28px monospace'; ctx.fillText('JOINT SENTRY V6.1', 30, 45);
-        ctx.font = '22px monospace'; ctx.fillStyle = '#88ccff';
-        ctx.fillText(`TEMP: ${temp.toFixed(1)}°C`, 30, 100);
-        ctx.fillText(`LOAD: ${current.toFixed(1)}A`, 30, 135);
-        ctx.fillText(`VOLT: ${voltage.toFixed(1)}kV`, 30, 170);
-        const hc = health > 90 ? '#00ff00' : health > 50 ? '#ffcc00' : '#ff3300';
-        ctx.fillStyle = hc; ctx.font = 'bold 26px monospace'; ctx.fillText(`HEALTH: ${health.toFixed(1)}%`, 30, 215);
-        screenTexRef.current.needsUpdate = true;
       }
 
       controls.update();
       composer.render();
 
-      if (renderer.info.render.frame % 10 === 0) onSensorUpdate({ pd, temp, vib: 0, loss: 0, voltage, current });
+      // 传感器数据更新 - 从每10帧降低到每15帧
+      if (frameCountRef.current % UPDATE_SENSOR_INTERVAL === 0) {
+        onSensorUpdate({ pd, temp, vib: 0, loss: 0, voltage, current });
+      }
     };
     animate();
 
@@ -322,6 +351,19 @@ const ThreeScene: React.FC<ThreeSceneProps> = ({ currentMode, isScanning, onSens
     return () => {
       window.removeEventListener('resize', handleResize);
       cancelAnimationFrame(animationId);
+      
+      // 清理资源防止内存泄漏
+      scene.traverse((obj) => {
+        if (obj instanceof THREE.Mesh) {
+          obj.geometry?.dispose();
+          if (Array.isArray(obj.material)) {
+            obj.material.forEach(m => m.dispose());
+          } else {
+            obj.material?.dispose();
+          }
+        }
+      });
+      
       renderer.dispose();
       composer.dispose();
     };

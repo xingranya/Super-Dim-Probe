@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { SensorData, FaultMode, MODES } from '../types';
 
 interface HUDProps {
@@ -6,7 +6,8 @@ interface HUDProps {
   mode: FaultMode;
 }
 
-const TelemetryItem: React.FC<{ label: string; value: string; unit: string; alert?: boolean }> = ({ label, value, unit, alert }) => (
+// 优化：使用React.memo防止不必要的重渲染
+const TelemetryItem: React.FC<{ label: string; value: string; unit: string; alert?: boolean }> = React.memo(({ label, value, unit, alert }) => (
   <div className={`bg-slate-900/60 border-r-2 ${alert ? 'border-red-500 bg-red-950/20' : 'border-cyan-500'} p-4 backdrop-blur-md transition-colors duration-500`}>
     <div className="text-[10px] text-cyan-400 font-black uppercase tracking-[0.2em] mb-1">{label}</div>
     <div className="flex items-baseline gap-2">
@@ -14,11 +15,13 @@ const TelemetryItem: React.FC<{ label: string; value: string; unit: string; aler
       <span className="text-xs text-slate-500 font-bold">{unit}</span>
     </div>
   </div>
-);
-
+));
 const HUD: React.FC<HUDProps> = ({ data, mode }) => {
-  const currentMode = MODES.find(m => m.id === mode);
-  const isAlert = data.temp > 80 || (mode === FaultMode.XLPE_TREEING);
+  const currentMode = useMemo(() => MODES.find(m => m.id === mode), [mode]);
+  const isAlert = useMemo(() => data.temp > 80 || (mode === FaultMode.XLPE_TREEING), [data.temp, mode]);
+  
+  // 优化：缓存时间戳更新，每秒更新一次
+  const timestamp = useMemo(() => new Date().toISOString(), [Math.floor(Date.now() / 1000)]);
 
   return (
     <div className="absolute inset-0 pointer-events-none p-10 flex flex-col justify-between z-10">
@@ -60,7 +63,7 @@ const HUD: React.FC<HUDProps> = ({ data, mode }) => {
         
         <div className="text-right">
             <div className="text-[10px] text-slate-600 font-mono uppercase tracking-[0.1em] mb-1">Authenticated Operator: admin_02</div>
-            <div className="text-[12px] text-slate-500 font-mono tracking-tighter">TIMESTAMP: {new Date().toISOString()}</div>
+            <div className="text-[12px] text-slate-500 font-mono tracking-tighter">TIMESTAMP: {timestamp}</div>
         </div>
       </div>
     </div>

@@ -10,7 +10,7 @@ interface AIPanelProps {
 const AIPanel: React.FC<AIPanelProps> = ({ isOpen, isLoading, content, onClose }) => {
   const [displayedText, setDisplayedText] = useState('');
   
-  // Robust Typewriter effect using slice to avoid duplication bugs
+  // 优化：使用 requestAnimationFrame 代替 setInterval 提升性能
   useEffect(() => {
     if (isLoading) {
       setDisplayedText('');
@@ -20,19 +20,26 @@ const AIPanel: React.FC<AIPanelProps> = ({ isOpen, isLoading, content, onClose }
     if (content) {
       let index = 0;
       setDisplayedText('');
+      let animationId: number;
+      let lastTime = performance.now();
       
-      const interval = setInterval(() => {
-        index += 2; // Type 2 characters per tick for better speed
-        if (index > content.length) index = content.length;
+      const animate = (currentTime: number) => {
+        const deltaTime = currentTime - lastTime;
         
-        setDisplayedText(content.slice(0, index));
-        
-        if (index >= content.length) {
-          clearInterval(interval);
+        // 每16ms更新一次（约60fps）
+        if (deltaTime > 16) {
+          index = Math.min(index + 3, content.length); // 每次增加3个字符
+          setDisplayedText(content.slice(0, index));
+          lastTime = currentTime;
         }
-      }, 10);
+        
+        if (index < content.length) {
+          animationId = requestAnimationFrame(animate);
+        }
+      };
       
-      return () => clearInterval(interval);
+      animationId = requestAnimationFrame(animate);
+      return () => cancelAnimationFrame(animationId);
     }
   }, [content, isLoading]);
 
