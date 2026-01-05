@@ -23,8 +23,8 @@ export interface ModeConfig {
 }
 
 export const MODES: ModeConfig[] = [
-  { id: FaultMode.XLPE_TREEING, name: "Partial Discharge", icon: "⚡", targetPos: 0.3, color: "#00ffff" },
-  { id: FaultMode.PVC_DAMAGE, name: "Structural Integrity", icon: "🛠️", targetPos: 0.7, color: "#ff3333" },
-  { id: FaultMode.JOINT_OVERHEAT, name: "Thermal Loading", icon: "🔥", targetPos: 0.5, color: "#ffaa00" },
-  { id: FaultMode.WATER_TREEING, name: "Insulation Health", icon: "💧", targetPos: 0.1, color: "#aa55ff" }
+  { id: FaultMode.XLPE_TREEING, name: "局部放电", icon: "⚡", targetPos: 0.3, color: "#00ffff" },
+  { id: FaultMode.PVC_DAMAGE, name: "结构损伤", icon: "🛠️", targetPos: 0.7, color: "#ff3333" },
+  { id: FaultMode.JOINT_OVERHEAT, name: "热负荷", icon: "🔥", targetPos: 0.5, color: "#ffaa00" },
+  { id: FaultMode.WATER_TREEING, name: "绝缘老化", icon: "💧", targetPos: 0.1, color: "#aa55ff" }
 ];

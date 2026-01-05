@@ -127,8 +127,9 @@ export const EnergyFlowShader = {
       
       vec3 finalColor = mix(baseColor, flowColor, flowMask);
       
-      // 添加边缘高光
-      float edge = pow(abs(vUv.y - 0.5) * 2.0, 0.5);
+      // 添加边缘高光 - 使用 sqrt 替代 pow(x, 0.5) 并添加保护
+      float edgeVal = abs(vUv.y - 0.5) * 2.0;
+      float edge = sqrt(max(edgeVal, 0.0001));
       finalColor += flowColor * (1.0 - edge) * 0.2 * flowMask;
       
       gl_FragColor = vec4(finalColor, 1.0);
@@ -166,9 +167,12 @@ export const ElectricTreeShader = {
     
     varying vec2 vUv;
     
-    // 简化的噪声函数
+    // 简化的噪声函数 - 优化精度
     float hash(vec2 p) {
-      return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
+      // 使用较小的常数避免精度溢出
+      vec2 k = vec2(0.3183099, 0.3678794);
+      p = p * k + k.yx;
+      return fract(16.0 * k.x * fract(p.x * p.y * (p.x + p.y)));
     }
     
     float noise(vec2 p) {
@@ -198,9 +202,10 @@ export const ElectricTreeShader = {
     void main() {
       vec2 uv = vUv - 0.5;
       
-      // 创建放射状电树图案
-      float angle = atan(uv.y, uv.x);
+      // 创建放射状电树图案 - 添加中心点保护避免除零
       float radius = length(uv);
+      // 当接近中心时使用默认角度，避免 atan(0,0) 的未定义行为
+      float angle = (radius > 0.001) ? atan(uv.y, uv.x) : 0.0;
       
       // 使用噪声创建分支效果
       float branches = fbm(vec2(angle * noiseScale, radius * 5.0 - time * 2.0));
@@ -267,10 +272,11 @@ export const ScanWaveShader = {
     void main() {
       float dist = length(vPosition.xz);
       
-      // 创建多个波纹
+      // 创建多个波纹 - 添加除零保护
       float wave = 0.0;
+      float safeWaveCount = max(waveCount, 0.001); // 防止除零
       for (float i = 0.0; i < 3.0; i++) {
-        float offset = i / waveCount;
+        float offset = i / safeWaveCount;
         float wavePos = fract(time * waveSpeed * 0.5 + offset);
         float waveDist = wavePos * fadeDistance;
         
@@ -326,8 +332,11 @@ export const HologramShader = {
     varying vec3 vNormal;
     varying vec3 vViewPosition;
     
+    // 优化的随机函数 - 避免精度溢出
     float random(vec2 st) {
-      return fract(sin(dot(st.xy, vec2(12.9898, 78.233))) * 43758.5453123);
+      vec2 k = vec2(0.3183099, 0.3678794);
+      st = st * k + k.yx;
+      return fract(16.0 * k.x * fract(st.x * st.y * (st.x + st.y)));
     }
     
     void main() {

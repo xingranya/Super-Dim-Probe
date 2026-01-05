@@ -12,18 +12,24 @@ import * as Shaders from '../utils/shaders';
 interface ThreeSceneProps {
   currentMode: FaultMode;
   isScanning: boolean;
+  isAutoDemo?: boolean;  // 自动演示模式
   onSensorUpdate: (data: SensorData) => void;
+  onDemoComplete?: () => void;  // 演示完成回调
 }
 
-const ThreeScene: React.FC<ThreeSceneProps> = ({ currentMode, isScanning, onSensorUpdate }) => {
+const ThreeScene: React.FC<ThreeSceneProps> = ({ currentMode, isScanning, isAutoDemo = false, onSensorUpdate, onDemoComplete }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const screenTexRef = useRef<THREE.CanvasTexture | null>(null);
   const screenCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  // 新增：存储所有屏幕的引用
+  const allScreenCanvasesRef = useRef<HTMLCanvasElement[]>([]);
+  const allScreenTexturesRef = useRef<THREE.CanvasTexture[]>([]);
+  
   const frameCountRef = useRef(0);
   const lastUpdateTimeRef = useRef(0);
 
-  const propsRef = useRef({ currentMode, isScanning, onSensorUpdate });
-  useEffect(() => { propsRef.current = { currentMode, isScanning, onSensorUpdate }; }, [currentMode, isScanning, onSensorUpdate]);
+  const propsRef = useRef({ currentMode, isScanning, isAutoDemo, onSensorUpdate, onDemoComplete });
+  useEffect(() => { propsRef.current = { currentMode, isScanning, isAutoDemo, onSensorUpdate, onDemoComplete }; }, [currentMode, isScanning, isAutoDemo, onSensorUpdate, onDemoComplete]);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -65,18 +71,24 @@ const ThreeScene: React.FC<ThreeSceneProps> = ({ currentMode, isScanning, onSens
     composer.addPass(new RenderPass(scene, camera));
     const bloomPass = new UnrealBloomPass(
       new THREE.Vector2(window.innerWidth, window.innerHeight), 
-      0.6,  // 降低强度
-      0.3,  // 降低半径
-      0.85
+      0.2,  // 再次降低强度 (原0.3)
+      0.1,  // 再次降低半径
+      0.95  // 再次提高阈值 (原0.9)，几乎消除泛光
     );
     composer.addPass(bloomPass);
 
-    // OrbitControls
+    // OrbitControls - 支持360°自由旋转查看六面体所有面
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.05;
     controls.minDistance = 1.5;
     controls.maxDistance = 8;
+    // 允许垂直方向360°旋转（移除极角限制）
+    controls.minPolarAngle = 0;           // 可以看到顶部
+    controls.maxPolarAngle = Math.PI;     // 可以看到底部
+    // 允许水平方向无限旋转（默认就是无限的，但显式设置更清晰）
+    controls.minAzimuthAngle = -Infinity;
+    controls.maxAzimuthAngle = Infinity;
 
     // 光照 - 优化后的柔和光照系统
     const mainSpot = new THREE.SpotLight(0xffffff, 80); // 降低主光强度
@@ -161,32 +173,31 @@ const ThreeScene: React.FC<ThreeSceneProps> = ({ currentMode, isScanning, onSens
     /**
      * 绘制传感器屏幕内容 - 宽屏版 (1024x256)
      */
-    const drawSensorScreen = (ctx: CanvasRenderingContext2D, faceIndex: number, face: typeof sensorFaces[0]) => {
-      const W = 1024, H = 256; // 4:1 比例适配物理尺寸
-      const colorHex = `#${face.color.toString(16).padStart(6, '0')}`;
+    const drawSensorScreen = (ctx: CanvasRenderingContext2D, faceIndex: number, face: any, time: number = 0) => {
+      const W = ctx.canvas.width;
+      const H = ctx.canvas.height;
+      const colorHex = '#' + face.color.toString(16).padStart(6, '0');
       
       // 背景
-      ctx.fillStyle = '#0a0a15';
+      ctx.fillStyle = '#050510';
       ctx.fillRect(0, 0, W, H);
       
-      // 边框发光效果
+      // 边框发光
+      ctx.shadowBlur = 15;
+      ctx.shadowColor = colorHex;
       ctx.strokeStyle = colorHex;
       ctx.lineWidth = 4;
-      ctx.strokeRect(4, 4, W - 8, H - 8);
+      ctx.strokeRect(10, 10, W - 20, H - 20);
+      ctx.shadowBlur = 0;
       
-      // 左侧标题栏背景 (占据左侧 25% 宽度)
-      const gradient = ctx.createLinearGradient(0, 0, W * 0.25, 0);
-      gradient.addColorStop(0, colorHex + '66');
-      gradient.addColorStop(1, colorHex + '11');
-      ctx.fillStyle = gradient;
-      ctx.fillRect(4, 4, W * 0.25, H - 8);
-      
-      // 标题文字和图标 (左侧)
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
+      // 左侧图标区域 (占宽度的 25%)
+      ctx.fillStyle = '#111122';
+      ctx.fillRect(12, 12, W * 0.25, H - 24);
       
       // 图标
-      ctx.font = '80px "Segoe UI Symbol"';
+      ctx.font = '80px Arial';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
       ctx.fillStyle = '#ffffff';
       ctx.fillText(face.icon, W * 0.125, H * 0.4);
       
@@ -209,22 +220,26 @@ const ThreeScene: React.FC<ThreeSceneProps> = ({ currentMode, isScanning, onSens
       
       // 根据面索引绘制不同内容
       switch (faceIndex) {
-        case 0: drawOverviewScreen(ctx, contentX, contentW, H, colorHex); break;
-        case 1: drawElectricalScreen(ctx, contentX, contentW, H, colorHex); break;
-        case 2: drawAcousticScreen(ctx, contentX, contentW, H, colorHex); break;
-        case 3: drawThermalScreen(ctx, contentX, contentW, H, colorHex); break;
-        case 4: drawVibrationScreen(ctx, contentX, contentW, H, colorHex); break;
-        case 5: drawXLPEScreen(ctx, contentX, contentW, H, colorHex); break;
+        case 0: drawOverviewScreen(ctx, contentX, contentW, H, colorHex, time); break;
+        case 1: drawElectricalScreen(ctx, contentX, contentW, H, colorHex, time); break;
+        case 2: drawPDScreen(ctx, contentX, contentW, H, colorHex, time); break; // 修复：之前是 drawAcousticScreen
+        case 3: drawThermalScreen(ctx, contentX, contentW, H, colorHex, time); break;
+        case 4: drawVibrationScreen(ctx, contentX, contentW, H, colorHex, time); break;
+        case 5: drawXLPEScreen(ctx, contentX, contentW, H, colorHex, time); break;
       }
     };
     
     // 综合状态 - 横向布局
-    const drawOverviewScreen = (ctx: CanvasRenderingContext2D, x: number, w: number, h: number, color: string) => {
+    // 综合状态 - 横向布局
+    const drawOverviewScreen = (ctx: CanvasRenderingContext2D, x: number, w: number, h: number, color: string, time: number) => {
+      // 动态数值
+      const health = (94 + Math.sin(time * 0.2) * 0.5).toFixed(1);
+
       // 居中大字健康度
       ctx.textAlign = 'left';
       ctx.fillStyle = color;
       ctx.font = 'bold 90px monospace';
-      ctx.fillText('94%', x + 20, 110);
+      ctx.fillText(`${health}%`, x + 20, 110);
       
       ctx.fillStyle = '#ffffff';
       ctx.font = '24px Arial';
@@ -241,10 +256,14 @@ const ThreeScene: React.FC<ThreeSceneProps> = ({ currentMode, isScanning, onSens
         ctx.fillStyle = '#1e293b';
         ctx.fillRect(bx, by, 140, 60);
         
+        // 动态闪烁点
+        const blink = Math.sin(time * 5 + i) > 0.5 ? 1 : 0.5;
         ctx.fillStyle = statusColors[i];
+        ctx.globalAlpha = blink;
         ctx.beginPath();
         ctx.arc(bx + 30, by + 30, 10, 0, Math.PI * 2);
         ctx.fill();
+        ctx.globalAlpha = 1.0;
         
         ctx.fillStyle = '#ffffff';
         ctx.font = 'bold 20px Arial';
@@ -254,7 +273,12 @@ const ThreeScene: React.FC<ThreeSceneProps> = ({ currentMode, isScanning, onSens
     };
     
     // 电学监测 - 横向布局
-    const drawElectricalScreen = (ctx: CanvasRenderingContext2D, x: number, w: number, h: number, color: string) => {
+    const drawElectricalScreen = (ctx: CanvasRenderingContext2D, x: number, w: number, h: number, color: string, time: number) => {
+      // 动态数值
+      const voltage = (110.5 + Math.sin(time * 0.5) * 0.2).toFixed(1);
+      const current = (248 + Math.sin(time * 0.3) * 5).toFixed(0);
+      const pd = (156 + Math.sin(time * 2) * 10).toFixed(0);
+
       // 分三列显示: 电压 | 电流 | 局放
       const colW = w / 3;
       
@@ -265,7 +289,7 @@ const ThreeScene: React.FC<ThreeSceneProps> = ({ currentMode, isScanning, onSens
       ctx.fillText('VOLTAGE', x + 20, 80);
       ctx.fillStyle = color;
       ctx.font = 'bold 50px monospace';
-      ctx.fillText('110.5', x + 20, 140);
+      ctx.fillText(voltage, x + 20, 140);
       ctx.font = '24px Arial';
       ctx.fillText('kV', x + 160, 140);
       
@@ -274,7 +298,7 @@ const ThreeScene: React.FC<ThreeSceneProps> = ({ currentMode, isScanning, onSens
       ctx.fillText('CURRENT', x + colW + 20, 80);
       ctx.fillStyle = color;
       ctx.font = 'bold 50px monospace';
-      ctx.fillText('248', x + colW + 20, 140);
+      ctx.fillText(current, x + colW + 20, 140);
       ctx.font = '24px Arial';
       ctx.fillText('A', x + colW + 120, 140);
       
@@ -283,7 +307,7 @@ const ThreeScene: React.FC<ThreeSceneProps> = ({ currentMode, isScanning, onSens
       ctx.fillText('PD LEVEL', x + colW * 2 + 20, 80);
       ctx.fillStyle = '#f59e0b'; // Warn color
       ctx.font = 'bold 50px monospace';
-      ctx.fillText('156', x + colW * 2 + 20, 140);
+      ctx.fillText(pd, x + colW * 2 + 20, 140);
       ctx.font = '24px Arial';
       ctx.fillText('pC', x + colW * 2 + 120, 140);
       
@@ -291,52 +315,66 @@ const ThreeScene: React.FC<ThreeSceneProps> = ({ currentMode, isScanning, onSens
       ctx.fillStyle = '#1e293b';
       ctx.fillRect(x + 20, 190, w - 40, 20);
       ctx.fillStyle = color;
-      ctx.fillRect(x + 20, 190, (w - 40) * 0.8, 20);
+      // 动态进度条
+      const factor = 0.8 + Math.sin(time) * 0.05;
+      ctx.fillRect(x + 20, 190, (w - 40) * factor, 20);
+      
       ctx.fillStyle = '#ffffff';
       ctx.font = '16px monospace';
       ctx.textAlign = 'center';
-      ctx.fillText('POWER FACTOR: 0.92', x + w / 2, 235);
+      const pf = (0.92 + Math.sin(time * 0.1) * 0.01).toFixed(2);
+      ctx.fillText(`POWER FACTOR: ${pf}`, x + w / 2, 235);
     };
     
-    // 声学监测 - 左文字右图表
-    const drawAcousticScreen = (ctx: CanvasRenderingContext2D, x: number, w: number, h: number, color: string) => {
+    // 局部放电 - 频谱图
+    const drawPDScreen = (ctx: CanvasRenderingContext2D, x: number, w: number, h: number, color: string, time: number) => {
       // 左侧数值
+      const val = (82 + Math.sin(time * 5) * 5 + Math.random() * 2).toFixed(0);
+      const count = (156 + Math.sin(time * 2) * 10).toFixed(0);
+
       ctx.textAlign = 'left';
       ctx.fillStyle = '#aaaaaa';
       ctx.font = '24px Arial';
-      ctx.fillText('PEAK dB', x + 20, 80);
+      ctx.fillText('PEAK pC', x + 20, 80);
       ctx.fillStyle = color;
       ctx.font = 'bold 60px monospace';
-      ctx.fillText('82', x + 20, 140);
+      ctx.fillText(val, x + 20, 140);
       
       ctx.fillStyle = '#aaaaaa';
-      ctx.font = '24px Arial';
-      ctx.fillText('COUNTS', x + 20, 190);
+      ctx.font = '20px Arial';
+      ctx.fillText('COUNTS pps', x + 20, 190);
       ctx.fillStyle = '#ffffff';
       ctx.font = 'bold 30px monospace';
-      ctx.fillText('23/min', x + 130, 190);
+      ctx.fillText(count, x + 20, 225);
       
       // 右侧频谱图
-      const chartX = x + 250;
-      const chartW = w - 280;
+      const chartX = x + 200;
+      const chartW = w - 220;
       const chartH = 150;
-      const chartY = 50;
+      const chartY = 60;
       
       // 坐标轴
       ctx.strokeStyle = '#333344';
+      ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.moveTo(chartX, chartY);
       ctx.lineTo(chartX, chartY + chartH);
       ctx.lineTo(chartX + chartW, chartY + chartH);
       ctx.stroke();
       
-      // 频谱条
-      const bars = 12;
-      const barW = (chartW / bars) - 5;
-      for(let i=0; i<bars; i++) {
-        const height = Math.random() * chartH * 0.8 + 10;
+      // 频谱柱状图 - 动态跳动
+      const barCount = 16;
+      const barWidth = (chartW / barCount) * 0.8;
+      const spacing = (chartW / barCount) * 0.2;
+      
+      for(let i=0; i<barCount; i++) {
+        // 基于时间和索引生成高度
+        const noise = Math.random() * 0.3;
+        const wave = Math.sin(time * 10 + i * 0.5) * 0.5 + 0.5;
+        const height = chartH * (0.2 + wave * 0.6 + noise) * (1 - i/barCount * 0.5); // 高频衰减
+        
         ctx.fillStyle = color;
-        ctx.fillRect(chartX + i * (barW + 5) + 5, chartY + chartH - height, barW, height);
+        ctx.fillRect(chartX + i * (barWidth + spacing) + spacing, chartY + chartH - height, barWidth, height);
       }
       ctx.fillStyle = '#aaaaaa';
       ctx.font = '14px Arial';
@@ -345,20 +383,24 @@ const ThreeScene: React.FC<ThreeSceneProps> = ({ currentMode, isScanning, onSens
     };
     
     // 热学监测 - 横向热力
-    const drawThermalScreen = (ctx: CanvasRenderingContext2D, x: number, w: number, h: number, color: string) => {
+    const drawThermalScreen = (ctx: CanvasRenderingContext2D, x: number, w: number, h: number, color: string, time: number) => {
+      // 动态数值
+      const maxTemp = (58.3 + Math.sin(time * 0.5) * 1.5).toFixed(1);
+      const avgTemp = (42.8 + Math.sin(time * 0.2) * 0.5).toFixed(1);
+
       // 数值区
       const valW = 200;
       ctx.textAlign = 'left';
       ctx.fillStyle = '#ef4444';
       ctx.font = 'bold 60px monospace';
-      ctx.fillText('58.3°C', x + 20, 110);
+      ctx.fillText(`${maxTemp}°C`, x + 20, 110);
       ctx.fillStyle = '#aaaaaa';
       ctx.font = '24px Arial';
       ctx.fillText('MAX TEMP', x + 20, 140);
       
       ctx.fillStyle = color;
       ctx.font = 'bold 40px monospace';
-      ctx.fillText('42.8°C', x + 250, 110);
+      ctx.fillText(`${avgTemp}°C`, x + 250, 110);
       ctx.fillStyle = '#aaaaaa';
       ctx.font = '20px Arial';
       ctx.fillText('AVG TEMP', x + 250, 140);
@@ -377,6 +419,16 @@ const ThreeScene: React.FC<ThreeSceneProps> = ({ currentMode, isScanning, onSens
       ctx.fillStyle = grad;
       ctx.fillRect(barX, barY, barW, barH);
       
+      // 动态指示器
+      const indicatorPos = (parseFloat(maxTemp) - 20) / (80 - 20); // 归一化位置
+      const indX = barX + barW * indicatorPos;
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.moveTo(indX, barY - 5);
+      ctx.lineTo(indX - 8, barY - 15);
+      ctx.lineTo(indX + 8, barY - 15);
+      ctx.fill();
+
       // 刻度
       ctx.fillStyle = '#ffffff';
       ctx.font = '14px Arial';
@@ -389,7 +441,10 @@ const ThreeScene: React.FC<ThreeSceneProps> = ({ currentMode, isScanning, onSens
     };
     
     // 振动监测 - 波形图
-    const drawVibrationScreen = (ctx: CanvasRenderingContext2D, x: number, w: number, h: number, color: string) => {
+    const drawVibrationScreen = (ctx: CanvasRenderingContext2D, x: number, w: number, h: number, color: string, time: number) => {
+      // 动态数值
+      const rms = (5.82 + Math.sin(time * 8) * 0.5 + (Math.random()-0.5)*0.2).toFixed(2);
+
       // 左侧数值
       ctx.textAlign = 'left';
       ctx.fillStyle = '#aaaaaa';
@@ -397,7 +452,7 @@ const ThreeScene: React.FC<ThreeSceneProps> = ({ currentMode, isScanning, onSens
       ctx.fillText('RMS mm/s', x + 20, 80);
       ctx.fillStyle = color;
       ctx.font = 'bold 60px monospace';
-      ctx.fillText('5.82', x + 20, 140);
+      ctx.fillText(rms, x + 20, 140);
       
       // 右侧波形
       const waveX = x + 250;
@@ -414,8 +469,10 @@ const ThreeScene: React.FC<ThreeSceneProps> = ({ currentMode, isScanning, onSens
       ctx.beginPath();
       ctx.strokeStyle = color;
       ctx.lineWidth = 3;
+      // 动态波形
+      const phase = time * 10;
       for(let i=0; i<waveW; i+=2) {
-        const val = Math.sin(i * 0.1) * 50 * Math.sin(i * 0.01) + (Math.random()-0.5)*10;
+        const val = Math.sin(i * 0.1 + phase) * 40 * Math.sin(i * 0.01) + (Math.random()-0.5)*5;
         if(i===0) ctx.moveTo(waveX + i, waveY + val);
         else ctx.lineTo(waveX + i, waveY + val);
       }
@@ -428,7 +485,11 @@ const ThreeScene: React.FC<ThreeSceneProps> = ({ currentMode, isScanning, onSens
     };
     
     // XLPE - 横向进度
-    const drawXLPEScreen = (ctx: CanvasRenderingContext2D, x: number, w: number, h: number, color: string) => {
+    const drawXLPEScreen = (ctx: CanvasRenderingContext2D, x: number, w: number, h: number, color: string, time: number) => {
+      // 动态数值
+      const health = (94 + Math.sin(time * 0.1) * 0.5).toFixed(1);
+      const load = (75 + Math.sin(time * 0.5) * 5).toFixed(0);
+
       // 寿命显示
       ctx.textAlign = 'left';
       ctx.fillStyle = '#aaaaaa';
@@ -451,10 +512,10 @@ const ThreeScene: React.FC<ThreeSceneProps> = ({ currentMode, isScanning, onSens
       ctx.fillStyle = '#1e293b';
       ctx.fillRect(barX, 100, barW, 30);
       ctx.fillStyle = color;
-      ctx.fillRect(barX, 100, barW * 0.94, 30);
+      ctx.fillRect(barX, 100, barW * (parseFloat(health)/100), 30);
       ctx.fillStyle = '#ffffff';
       ctx.font = 'bold 20px monospace';
-      ctx.fillText('94%', barX + barW * 0.94 + 10, 122);
+      ctx.fillText(`${health}%`, barX + barW * (parseFloat(health)/100) + 10, 122);
       
       // 负荷条
       ctx.fillStyle = '#aaaaaa';
@@ -464,10 +525,10 @@ const ThreeScene: React.FC<ThreeSceneProps> = ({ currentMode, isScanning, onSens
       ctx.fillStyle = '#1e293b';
       ctx.fillRect(barX, 190, barW, 30);
       ctx.fillStyle = '#f59e0b';
-      ctx.fillRect(barX, 190, barW * 0.75, 30);
+      ctx.fillRect(barX, 190, barW * (parseFloat(load)/100), 30);
       ctx.fillStyle = '#ffffff';
       ctx.font = 'bold 20px monospace';
-      ctx.fillText('75%', barX + barW * 0.75 + 10, 212);
+      ctx.fillText(`${load}%`, barX + barW * (parseFloat(load)/100) + 10, 212);
     };
     
     
@@ -515,6 +576,10 @@ const ThreeScene: React.FC<ThreeSceneProps> = ({ currentMode, isScanning, onSens
     // 六边形面到中心的距离（apothem）- 屏幕需要紧贴在这个距离上
     const faceApothem = hexRadius * Math.cos(Math.PI / 6);
     
+    // 清空引用
+    allScreenCanvasesRef.current = [];
+    allScreenTexturesRef.current = [];
+
     for (let i = 0; i < 6; i++) {
       const face = sensorFaces[i];
       // 六边形的每个面的角度
@@ -527,13 +592,15 @@ const ThreeScene: React.FC<ThreeSceneProps> = ({ currentMode, isScanning, onSens
       canvas.width = 1024;
       canvas.height = 256;
       screenCanvases.push(canvas);
+      allScreenCanvasesRef.current.push(canvas);
       
       // 根据传感器类型绘制专业数据界面
       const ctx = canvas.getContext('2d')!;
-      drawSensorScreen(ctx, i, face);
+      drawSensorScreen(ctx, i, face, 0);
       
       const screenTex = new THREE.CanvasTexture(canvas);
       screenTextures.push(screenTex);
+      allScreenTexturesRef.current.push(screenTex);
       
       // 屏幕位置：在六边形面的外侧
       // 六边形绕Z轴旋转后，面的法向量在YZ平面上
@@ -543,27 +610,31 @@ const ThreeScene: React.FC<ThreeSceneProps> = ({ currentMode, isScanning, onSens
       // 屏幕平面
       const screenMesh = new THREE.Mesh(
         new THREE.PlaneGeometry(screenFaceWidth, screenFaceHeight),
-        new THREE.MeshBasicMaterial({ map: screenTex, side: THREE.DoubleSide })
+        new THREE.MeshBasicMaterial({ 
+          map: screenTex, 
+          color: 0xdddddd,        // 稍微降低亮度，防止Bloom过曝
+          side: THREE.DoubleSide 
+        })
       );
       screenMesh.position.set(0, screenY, screenZ);
-      // 旋转屏幕让它平贴在面上：
-      // 1. 先绕X轴旋转90度让屏幕从XY平面变成XZ平面
-      // 2. 再绕X轴旋转faceAngle对齐到对应的六边形面
+      
+      // 旋转屏幕让它平贴在面上
       screenMesh.rotation.x = Math.PI / 2 + faceAngle;
       
       // 修复屏幕内容倒置和镜像问题
-      // 修复屏幕内容倒置和镜像问题
-      // 0,1,2,3 面需要翻转180度，4,5 面不需要
-      if (i <= 3) {
-        screenMesh.rotateZ(Math.PI);
-      }
+      // 统一翻转所有面，确保方向一致
+      screenMesh.rotateZ(Math.PI);
       screenMesh.scale.x = -1; // 解决水平镜像
-      
+
       sensorGroup.add(screenMesh);
       
-      // 边框
-      const borderMat = new THREE.MeshBasicMaterial({ color: face.color, transparent: true, opacity: 0.9, side: THREE.DoubleSide });
-      const borderThickness = 0.012;
+      // 边框材质 - 降低反光
+      const borderMat = new THREE.MeshStandardMaterial({ 
+        color: 0x111111, 
+        roughness: 0.9, 
+        metalness: 0.2 
+      });
+      const borderThickness = 0.015;
       const borderOffset = faceApothem + 0.006;
       
       // 上边框
@@ -609,20 +680,9 @@ const ThreeScene: React.FC<ThreeSceneProps> = ({ currentMode, isScanning, onSens
     });
     
     
-    // 天线组件
-    const antennaMat = new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.3, metalness: 0.8 });
-    const antennaBase = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.03, 0.05, 16), antennaMat);
-    antennaBase.position.set(0, hexRadius + 0.03, 0);
-    sensorGroup.add(antennaBase);
-    const antennaRod = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.18, 8), antennaMat);
-    antennaRod.position.set(0, hexRadius + 0.15, 0);
-    sensorGroup.add(antennaRod);
-    const antennaTip = new THREE.Mesh(
-      new THREE.SphereGeometry(0.02, 16, 16), 
-      new THREE.MeshBasicMaterial({ color: 0xff0000 })
-    );
-    antennaTip.position.set(0, hexRadius + 0.26, 0);
-    sensorGroup.add(antennaTip);
+
+    // 天线组件已移除（用户反馈红色摇杆太突兀）
+
 
     // 故障效果
     const thermalGlow = new THREE.PointLight(0xff3300, 0, 2.0);
@@ -675,12 +735,81 @@ const ThreeScene: React.FC<ThreeSceneProps> = ({ currentMode, isScanning, onSens
     let animationId: number;
     const UPDATE_SENSOR_INTERVAL = 15; // 每15帧更新一次传感器
     const UPDATE_SCREEN_INTERVAL = 10; // 每10帧更新一次屏幕
+    
+    // 自动演示模式参数
+    const TOTAL_FACES = 6;                    // 六面体有6个面
+    const HOLD_TIME = 2.0;                    // 每个面停留2秒
+    const TRANSITION_TIME = 1.0;              // 过渡旋转1秒
+    const CYCLE_TIME = HOLD_TIME + TRANSITION_TIME;  // 每个面总计3秒
+    const TOTAL_DEMO_TIME = TOTAL_FACES * CYCLE_TIME; // 总演示时间18秒
+    const CAMERA_RADIUS = 3.5;                // 相机距离
+    let demoStartTime = 0;                    // 演示开始时间
+    let wasAutoDemo = false;                  // 上一帧是否在演示
 
     const animate = () => {
       animationId = requestAnimationFrame(animate);
       const time = clock.getElapsedTime();
-      const { currentMode, onSensorUpdate } = propsRef.current;
+      const { currentMode, isAutoDemo, onSensorUpdate } = propsRef.current;
       frameCountRef.current++;
+
+      // 自动演示模式：分步展示6个面
+      if (isAutoDemo) {
+        // 记录演示开始时间
+        if (!wasAutoDemo) {
+          demoStartTime = time;
+          wasAutoDemo = true;
+        }
+        
+        const elapsed = time - demoStartTime;
+        
+        // 检查是否完成一圈
+        if (elapsed < TOTAL_DEMO_TIME) {
+          // 计算当前在哪个面
+          const cycleProgress = elapsed / CYCLE_TIME;
+          const currentFace = Math.floor(cycleProgress);
+          const withinCycle = (cycleProgress - currentFace) * CYCLE_TIME;
+          
+          // 计算目标角度（每个面相隔60度 = PI/3）
+          // 六边形面的角度偏移，使相机正对每个面
+          const faceAngle = (currentFace / TOTAL_FACES) * Math.PI * 2;
+          
+          let targetAngle: number;
+          if (withinCycle < HOLD_TIME) {
+            // 停留阶段：保持当前面的角度
+            targetAngle = faceAngle;
+          } else {
+            // 过渡阶段：平滑旋转到下一个面
+            const transitionProgress = (withinCycle - HOLD_TIME) / TRANSITION_TIME;
+            const eased = transitionProgress * transitionProgress * (3 - 2 * transitionProgress); // smoothstep
+            const nextFaceAngle = ((currentFace + 1) / TOTAL_FACES) * Math.PI * 2;
+            targetAngle = faceAngle + (nextFaceAngle - faceAngle) * eased;
+          }
+          
+          // 设置相机位置 - 优化为正对观察
+          // 移除之前的倾斜偏移，改为正对圆周运动，但配合动态Up向量
+          camera.position.x = 0.5; // 极小的X偏移，几乎正对，避免透视变形
+          camera.position.y = Math.cos(targetAngle) * CAMERA_RADIUS;
+          camera.position.z = Math.sin(targetAngle) * CAMERA_RADIUS;
+          
+          camera.lookAt(0, 0, 0);
+
+          // 关键修复：动态计算 Up 向量，确保 X 轴（文字方向）在屏幕上始终水平
+          // 就像手里拿着圆柱体转动看一样，而不是歪着头看
+          const right = new THREE.Vector3(1, 0, 0); // 理想的右方向（平行于文字行）
+          const forward = new THREE.Vector3().subVectors(new THREE.Vector3(0,0,0), camera.position).normalize();
+          const up = new THREE.Vector3().crossVectors(right, forward).normalize();
+          camera.up.copy(up);
+        } else {
+          // 演示完成，调用回调通知停止
+          if (wasAutoDemo) {
+            wasAutoDemo = false;
+            propsRef.current.onDemoComplete?.();
+          }
+        }
+      } else {
+        wasAutoDemo = false;
+      }
+
 
       let voltage = 110.5 + Math.sin(time * 0.5) * 0.3;
       let current = 428.1 + Math.sin(time * 0.3) * 2;
@@ -756,32 +885,22 @@ const ThreeScene: React.FC<ThreeSceneProps> = ({ currentMode, isScanning, onSens
         });
       }
 
-      // 天线闪烁 - 优化更新频率
-      if (frameCountRef.current % 3 === 0 && antennaTip.material instanceof THREE.MeshBasicMaterial) {
-        antennaTip.material.opacity = 0.5 + Math.sin(time * 5) * 0.5;
-      }
-
-      // 屏幕更新 - 降低更新频率从每帧到每10帧
-      if (frameCountRef.current % UPDATE_SCREEN_INTERVAL === 0) {
-        const ctx = screenCanvasRef.current?.getContext('2d');
-        if (ctx && screenTexRef.current) {
-          ctx.fillStyle = '#010810'; ctx.fillRect(0, 0, 512, 256);
-          ctx.strokeStyle = '#00f3ff'; ctx.lineWidth = 4; ctx.strokeRect(6, 6, 500, 244);
-          ctx.fillStyle = '#00f3ff'; ctx.font = 'bold 28px monospace'; ctx.fillText('JOINT SENTRY V6.1', 30, 45);
-          ctx.font = '22px monospace'; ctx.fillStyle = '#88ccff';
-          ctx.fillText(`TEMP: ${temp.toFixed(1)}°C`, 30, 100);
-          ctx.fillText(`LOAD: ${current.toFixed(1)}A`, 30, 135);
-          ctx.fillText(`VOLT: ${voltage.toFixed(1)}kV`, 30, 170);
-          const hc = health > 90 ? '#00ff00' : health > 50 ? '#ffcc00' : '#ff3300';
-          ctx.fillStyle = hc; ctx.font = 'bold 26px monospace'; ctx.fillText(`HEALTH: ${health.toFixed(1)}%`, 30, 215);
-          screenTexRef.current.needsUpdate = true;
-        }
+      // 屏幕更新 - 降低更新频率从每帧到每5帧
+      if (frameCountRef.current % 5 === 0) {
+        allScreenCanvasesRef.current.forEach((canvas, i) => {
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            drawSensorScreen(ctx, i, sensorFaces[i], time);
+          }
+        });
+        allScreenTexturesRef.current.forEach(tex => tex.needsUpdate = true);
       }
 
       controls.update();
       composer.render();
 
       // 传感器数据更新 - 从每10帧降低到每15帧
+      const UPDATE_SENSOR_INTERVAL = 15;
       if (frameCountRef.current % UPDATE_SENSOR_INTERVAL === 0) {
         onSensorUpdate({ pd, temp, vib: 0, loss: 0, voltage, current });
       }
