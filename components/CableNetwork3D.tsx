@@ -360,229 +360,286 @@ const CableNetwork3D: React.FC<CableNetwork3DProps> = ({
     scene.add(group);
     return group;
   }, []);
-
-  // 创建电缆 (Phase 3 升级版 - 真实材质+细节建模)
+  // 创建电缆 (Phase 9 Pro Max - 真实多层结构+工业质感)
   const createCable = useCallback((segment: CableSegment, color: string, thickness: number, scene: THREE.Scene) => {
     const start = new THREE.Vector3(...segment.start);
     const end = new THREE.Vector3(...segment.end);
     const length = start.distanceTo(end);
     const direction = new THREE.Vector3().subVectors(end, start).normalize();
-    
-    // === 1. 程序化法线贴图纹理 (螺旋线缆纹理) ===
-    const canvas = document.createElement('canvas');
-    canvas.width = 256;
-    canvas.height = 256;
-    const ctx = canvas.getContext('2d');
-    if (ctx) {
-      // 背景
-      ctx.fillStyle = '#808080';
-      ctx.fillRect(0, 0, 256, 256);
+    const center = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
+
+    const group = new THREE.Group();
+
+    // === 1. 程序化纹理生成 ===
+    // 螺旋纹理 (Normal Map)
+    const normalCanvas = document.createElement('canvas');
+    normalCanvas.width = 256;
+    normalCanvas.height = 256;
+    const nCtx = normalCanvas.getContext('2d');
+    if (nCtx) {
+      nCtx.fillStyle = '#8080ff'; // 默认法线颜色
+      nCtx.fillRect(0, 0, 256, 256);
       
-      // 螺旋线纹理
-      const gradient = ctx.createLinearGradient(0, 0, 256, 0);
-      gradient.addColorStop(0, '#505050');
-      gradient.addColorStop(0.3, '#a0a0a0');
-      gradient.addColorStop(0.5, '#e0e0e0');
-      gradient.addColorStop(0.7, '#a0a0a0');
-      gradient.addColorStop(1, '#505050');
-      
-      ctx.strokeStyle = gradient;
-      ctx.lineWidth = 8;
-      for (let y = -20; y < 280; y += 12) {
-        ctx.beginPath();
-        ctx.moveTo(0, y);
-        ctx.lineTo(256, y + 40);
-        ctx.stroke();
+      // 绘制螺旋条纹
+      for (let i = -100; i < 356; i += 20) {
+        nCtx.beginPath();
+        nCtx.strokeStyle = '#a0a0ff'; // 凸起
+        nCtx.lineWidth = 10;
+        nCtx.moveTo(0, i);
+        nCtx.lineTo(256, i + 100);
+        nCtx.stroke();
       }
     }
-    const normalMap = new THREE.CanvasTexture(canvas);
+    const normalMap = new THREE.CanvasTexture(normalCanvas);
     normalMap.wrapS = THREE.RepeatWrapping;
     normalMap.wrapT = THREE.RepeatWrapping;
-    normalMap.repeat.set(1, Math.max(1, length / 8));
-    
-    // === 2. 电缆主体 (MeshPhysicalMaterial 真实质感) ===
-    const geo = new THREE.CylinderGeometry(thickness, thickness, length, 32, 8);
-    geo.rotateX(Math.PI / 2);
-    
-    const mat = new THREE.MeshPhysicalMaterial({
-      color: color,
-      roughness: 0.45,
-      metalness: 0.15,
+    normalMap.repeat.set(1, length / 2); // 根据长度重复
+
+    // 文字纹理 (Alpha Map)
+    const textCanvas = document.createElement('canvas');
+    textCanvas.width = 1024;
+    textCanvas.height = 128;
+    const tCtx = textCanvas.getContext('2d');
+    if (tCtx) {
+      tCtx.fillStyle = '#000000'; // 透明背景
+      tCtx.fillRect(0, 0, 1024, 128);
+      tCtx.fillStyle = '#FFFFFF'; // 白色文字
+      tCtx.font = 'bold 40px Arial';
+      tCtx.textAlign = 'center';
+      tCtx.textBaseline = 'middle';
+      tCtx.fillText('SUPER-DIM 110kV XLPE POWER CABLE  ⚡  HIGH VOLTAGE  ⚡  DO NOT TOUCH', 512, 64);
+    }
+    const textMap = new THREE.CanvasTexture(textCanvas);
+    textMap.wrapS = THREE.RepeatWrapping;
+    textMap.wrapT = THREE.RepeatWrapping;
+    textMap.repeat.set(length / 10, 1);
+
+    // === 2. 电缆主体 (外护套) ===
+    const sheathGeo = new THREE.CylinderGeometry(thickness, thickness, length, 32);
+    const sheathMat = new THREE.MeshPhysicalMaterial({
+      color: '#1a1a1a', // 深色工业橡胶
+      roughness: 0.6,
+      metalness: 0.1,
       normalMap: normalMap,
-      normalScale: new THREE.Vector2(0.3, 0.3),
-      clearcoat: 0.2,
+      normalScale: new THREE.Vector2(0.5, 0.5),
+      clearcoat: 0.3,
       clearcoatRoughness: 0.4,
     });
-    
-    const mesh = new THREE.Mesh(geo, mat);
-    const mid = start.clone().add(end).multiplyScalar(0.5);
-    mesh.position.copy(mid);
-    mesh.lookAt(end);
-    mesh.castShadow = true;
-    scene.add(mesh);
-    
-    // === 3. 外层绝缘护套 (半透明) ===
-    const sheathGeo = new THREE.CylinderGeometry(thickness * 1.08, thickness * 1.08, length - 0.2, 24, 1);
-    sheathGeo.rotateX(Math.PI / 2);
-    const sheathMat = new THREE.MeshPhysicalMaterial({
-      color: '#111827',
-      roughness: 0.7,
-      metalness: 0,
-      transparent: true,
-      opacity: 0.15,
-    });
     const sheath = new THREE.Mesh(sheathGeo, sheathMat);
-    sheath.position.copy(mid);
-    sheath.lookAt(end);
-    scene.add(sheath);
     
-    // === 4. 接头环 (金属质感) ===
-    const ringCount = Math.max(1, Math.floor(length / 10));
-    const ringGeo = new THREE.TorusGeometry(thickness * 1.2, thickness * 0.18, 12, 24);
-    const ringMat = new THREE.MeshPhysicalMaterial({ 
-      color: '#1F2937', 
-      roughness: 0.3, 
-      metalness: 0.8,
-      clearcoat: 0.5
+    // 旋转对齐
+    const quaternion = new THREE.Quaternion();
+    quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction);
+    sheath.setRotationFromQuaternion(quaternion);
+    sheath.position.copy(center);
+    sheath.castShadow = true;
+    group.add(sheath);
+
+    // === 3. 文字标识层 (贴花) ===
+    // 使用稍微大一点的圆柱体作为文字层，避免z-fighting
+    const labelGeo = new THREE.CylinderGeometry(thickness * 1.01, thickness * 1.01, length, 32);
+    const labelMat = new THREE.MeshBasicMaterial({
+      map: textMap,
+      transparent: true,
+      opacity: 0.6,
+      blending: THREE.AdditiveBlending,
+      side: THREE.DoubleSide,
+      depthWrite: false
     });
+    const labelMesh = new THREE.Mesh(labelGeo, labelMat);
+    labelMesh.setRotationFromQuaternion(quaternion);
+    labelMesh.position.copy(center);
+    group.add(labelMesh);
+
+    // === 4. 端部多层结构展示 (仅在两端) ===
+    // 只有当电缆长度足够时才展示
+    if (length > 5) {
+      const layers = [
+        { r: thickness * 0.85, color: '#b87333', metal: 0.8, rough: 0.3, name: '屏蔽层' }, // 铜屏蔽
+        { r: thickness * 0.75, color: '#f0f0f0', metal: 0.0, rough: 0.2, trans: true, op: 0.9, name: '绝缘层' }, // XLPE绝缘
+        { r: thickness * 0.3, color: '#ffdf00', metal: 1.0, rough: 0.4, name: '导体' } // 铜导体
+      ];
+
+      // 在两端创建层级结构
+      [start, end].forEach((pos, idx) => {
+        const offset = idx === 0 ? 1 : -1;
+        // 稍微缩进一点，避免完全重叠
+        const layerCenter = new THREE.Vector3().copy(pos).add(direction.clone().multiplyScalar(offset * 0.5));
+        
+        layers.forEach((layer, i) => {
+          // 层级递进露出
+          const layerLen = 1.5 + i * 0.5; 
+          const geo = new THREE.CylinderGeometry(layer.r, layer.r, layerLen, 24);
+          const mat = new THREE.MeshPhysicalMaterial({
+            color: layer.color,
+            metalness: layer.metal,
+            roughness: layer.rough,
+            transparent: layer.trans || false,
+            opacity: layer.op || 1.0,
+            side: THREE.DoubleSide
+          });
+          const mesh = new THREE.Mesh(geo, mat);
+          mesh.setRotationFromQuaternion(quaternion);
+          // 调整位置使其从端口伸出
+          const shift = direction.clone().multiplyScalar(offset * (length / 2 - layerLen / 2 + i * 0.2)); 
+          mesh.position.copy(center).add(shift);
+          group.add(mesh);
+        });
+      });
+    }
+
+    // === 5. 固定卡具 (工业细节) ===
+    const ringCount = Math.floor(length / 8);
+    const ringGeo = new THREE.BoxGeometry(thickness * 2.5, thickness * 0.5, thickness * 0.8);
+    const ringMat = new THREE.MeshStandardMaterial({ color: '#475569', roughness: 0.5, metalness: 0.8 });
     
     for (let i = 1; i <= ringCount; i++) {
       const t = i / (ringCount + 1);
-      const pos = start.clone().lerp(end, t);
+      const pos = new THREE.Vector3().lerpVectors(start, end, t);
       const ring = new THREE.Mesh(ringGeo, ringMat);
       ring.position.copy(pos);
       ring.lookAt(end);
-      scene.add(ring);
+      group.add(ring);
     }
-    
-    // === 5. 端点球头 (过渡连接) ===
-    const capGeo = new THREE.SphereGeometry(thickness * 1.1, 24, 24);
-    const capMat = new THREE.MeshPhysicalMaterial({ 
-      color: color, 
-      roughness: 0.45, 
-      metalness: 0.15,
-      clearcoat: 0.2
-    });
-    
-    const cap1 = new THREE.Mesh(capGeo, capMat);
-    cap1.position.copy(start);
-    scene.add(cap1);
-    
-    const cap2 = new THREE.Mesh(capGeo, capMat);
-    cap2.position.copy(end);
-    scene.add(cap2);
-    
-    return mesh;
+
+    // === 6. 拐角平滑处理 (球形接头) ===
+    // 在起点和终点添加与护套同材质的球体，解决圆柱体拼接时的缝隙和锐角问题
+    const jointSphereGeo = new THREE.SphereGeometry(thickness, 24, 24);
+    // 复用护套材质
+    const startJoint = new THREE.Mesh(jointSphereGeo, sheathMat);
+    startJoint.position.copy(start);
+    group.add(startJoint);
+
+    const endJoint = new THREE.Mesh(jointSphereGeo, sheathMat);
+    endJoint.position.copy(end);
+    group.add(endJoint);
+
+    scene.add(group);
   }, []);
 
-  // 创建传感器标记 (Phase 4 科技感版: 悬浮光球 + 动态光环 + 地面接线盒)
+  // 创建传感器节点 (Phase 9 Pro Max - 最终修复版)
   const createSensor = useCallback((sensor: Sensor, scene: THREE.Scene) => {
     const group = new THREE.Group();
-    const statusColors = {
-      normal: '#8B5CF6',  // 紫色
-      warning: '#F59E0B', // 黄色
-      fault: '#EF4444'    // 红色
-    };
-    const color = statusColors[sensor.status];
+    // 关键修复：将组的位置设置为传感器位置，作为缩放的中心点 (Pivot Point)
+    // 这样缩放时就不会"漂移"了
+    group.position.set(sensor.position[0], sensor.position[1], sensor.position[2]);
+
+    const color = sensor.status === 'normal' ? '#10B981' : (sensor.status === 'warning' ? '#F59E0B' : '#EF4444');
     
-    // 1. 地面接线盒 (加大，表示传感器位置)
-    const boxGeo = new THREE.BoxGeometry(2.5, 1.2, 2.5);  // 加大
-    const boxMat = new THREE.MeshStandardMaterial({ 
-      color: '#6B7280', 
-      roughness: 0.5, 
-      metalness: 0.3 
+    // 1. 抱箍式接头 (紧贴电缆)
+    // 使用圆柱体模拟抱箍，位置相对 group 原点 (0,0,0)
+    const clampGeo = new THREE.CylinderGeometry(1.2, 1.2, 1.5, 32);
+    const clampMat = new THREE.MeshPhysicalMaterial({
+      color: '#1e293b', // 蓝灰色工业金属
+      roughness: 0.5,
+      metalness: 0.7,
+      clearcoat: 0.3
     });
+    const clamp = new THREE.Mesh(clampGeo, clampMat);
+    clamp.rotation.z = Math.PI / 2; // 横向
+    clamp.position.set(0, 0.5, 0); // 稍微抬高，紧贴地面电缆
+    clamp.castShadow = true;
+    clamp.userData = { sensorId: sensor.id };
+    group.add(clamp);
+
+    // 2. 智能监测盒 (安装在抱箍上)
+    const boxGeo = new THREE.BoxGeometry(1.0, 0.8, 1.0);
+    const boxMat = new THREE.MeshPhysicalMaterial({ color: '#334155', metalness: 0.5, roughness: 0.2 });
     const box = new THREE.Mesh(boxGeo, boxMat);
-    box.position.set(sensor.position[0], 0.6, sensor.position[2]);
+    box.position.set(0, 1.4, 0); // 在抱箍上方
     box.castShadow = true;
+    box.userData = { sensorId: sensor.id };
     group.add(box);
-    
-    // 接线盒边框
-    const boxEdges = new THREE.EdgesGeometry(boxGeo);
-    const boxEdgeMat = new THREE.LineBasicMaterial({ color: color });
-    const boxEdgeLine = new THREE.LineSegments(boxEdges, boxEdgeMat);
-    boxEdgeLine.position.copy(box.position);
-    group.add(boxEdgeLine);
-    
-    // 接线盒顶部发光条
-    const stripGeo = new THREE.BoxGeometry(2.2, 0.15, 2.2);
-    const stripMat = new THREE.MeshBasicMaterial({ color: color });
-    const strip = new THREE.Mesh(stripGeo, stripMat);
-    strip.position.set(sensor.position[0], 1.28, sensor.position[2]);
-    group.add(strip);
-    
-    // 2. 悬浮核心球 (加大) - 提高到更高位置 (高于楼房，约30m)
-    const coreGeo = new THREE.SphereGeometry(1.5, 32, 32);  // 再加大
-    const coreMat = new THREE.MeshPhysicalMaterial({
-      color: color,
-      emissive: color,
-      emissiveIntensity: 0.5,
-      roughness: 0.15,
-      metalness: 0.2,
-      clearcoat: 0.8
-    });
-    const core = new THREE.Mesh(coreGeo, coreMat);
-    core.position.set(sensor.position[0], 30.0, sensor.position[2]); // 提高到30.0
-    core.userData = { sensorId: sensor.id, sensorName: sensor.name, floatPhase: Math.random() * Math.PI * 2 };
-    group.add(core);
-    
-    // 3. 外层光环 (加大)
-    const ringGeo1 = new THREE.TorusGeometry(2.2, 0.08, 16, 64); // 加大
-    const ringMat = new THREE.MeshBasicMaterial({ color: color, transparent: true, opacity: 0.7 });
-    const ring1 = new THREE.Mesh(ringGeo1, ringMat);
-    ring1.position.copy(core.position);
-    ring1.rotation.x = Math.PI / 2;
-    ring1.userData.rotateSpeed = 0.02;
-    group.add(ring1);
-    
-    // 4. 内层光环 (加大)
-    const ringGeo2 = new THREE.TorusGeometry(1.6, 0.06, 16, 48);
-    const ring2 = new THREE.Mesh(ringGeo2, ringMat.clone());
-    ring2.position.copy(core.position);
-    ring2.rotation.x = Math.PI / 3;
-    ring2.rotation.z = Math.PI / 4;
-    ring2.userData.rotateSpeed = -0.03;
-    group.add(ring2);
-    
-    // 5. 垂直光柱 (从接线盒到光球，贯穿)
-    const beamGeo = new THREE.CylinderGeometry(0.1, 0.2, 29, 8); // 加长到29
-    const beamMat = new THREE.MeshBasicMaterial({ 
-      color: color, 
-      transparent: true, 
-      opacity: 0.3 
-    });
+
+    // 3. 状态指示灯 (呼吸灯)
+    const lightGeo = new THREE.SphereGeometry(0.3, 16, 16);
+    const lightMat = new THREE.MeshStandardMaterial({ color: color, emissive: color, emissiveIntensity: 2.0 });
+    const light = new THREE.Mesh(lightGeo, lightMat);
+    light.position.set(0, 1.9, 0); // 顶部
+    light.userData = { sensorId: sensor.id };
+    group.add(light);
+
+    // 4. 全息光环 (状态指示)
+    const ringGeo = new THREE.TorusGeometry(1.5, 0.05, 16, 64);
+    const ringMat = new THREE.MeshBasicMaterial({ color: color, transparent: true, opacity: 0.6 });
+    const ring = new THREE.Mesh(ringGeo, ringMat);
+    ring.rotation.x = Math.PI / 2;
+    ring.position.set(0, 1.0, 0);
+    ring.userData = { sensorId: sensor.id };
+    group.add(ring);
+
+    // 5. 接地系统 (连接到侧面)
+    const groundWirePath = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(0, 0.5, 0),
+      new THREE.Vector3(1.5, 0.2, 1.5),
+      new THREE.Vector3(2.5, 0, 2.5)
+    ]);
+    const groundWireGeo = new THREE.TubeGeometry(groundWirePath, 20, 0.05, 8, false);
+    const groundWireMat = new THREE.MeshStandardMaterial({ color: '#000000' });
+    const groundWire = new THREE.Mesh(groundWireGeo, groundWireMat);
+    group.add(groundWire);
+
+    const groundBoxGeo = new THREE.BoxGeometry(0.8, 0.5, 0.8);
+    const groundBoxMat = new THREE.MeshStandardMaterial({ color: '#475569' });
+    const groundBox = new THREE.Mesh(groundBoxGeo, groundBoxMat);
+    groundBox.position.set(2.5, 0.25, 2.5);
+    groundBox.userData = { sensorId: sensor.id };
+    group.add(groundBox);
+
+    // 6. 垂直光柱 (指示位置，防止穿模，稍微细一点)
+    const beamGeo = new THREE.CylinderGeometry(0.02, 0.02, 20, 8);
+    const beamMat = new THREE.MeshBasicMaterial({ color: color, transparent: true, opacity: 0.2 });
     const beam = new THREE.Mesh(beamGeo, beamMat);
-    beam.position.set(sensor.position[0], 15, sensor.position[2]); // 中心点在15
+    beam.position.set(0, 10, 0);
+    beam.userData = { sensorId: sensor.id };
     group.add(beam);
-    
-    // 保存引用用于交互
-    sensorMeshesRef.current.set(sensor.id, core);
+
+    // 保存 Group 到引用
+    sensorMeshesRef.current.set(sensor.id, group as any);
     
     scene.add(group);
     return group;
   }, []);
 
-  // 创建文字标签
-  const createLabel = useCallback((text: string, position: [number, number, number], scene: THREE.Scene) => {
+  // 创建文字标签 (增强版 - 纯净交互)
+  const createLabel = useCallback((text: string, position: [number, number, number], scene: THREE.Scene, sensorId?: string) => {
     const div = document.createElement('div');
+    // 使用 Flex 布局包含文本
+    div.className = 'sensor-label';
     div.style.cssText = `
-      background: rgba(139, 92, 246, 0.95);
-      color: white;
-      padding: 8px 14px;
-      border-radius: 8px;
-      font-size: 13px;
-      font-weight: 600;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.3);
-      pointer-events: none;
-      white-space: nowrap;
+      background: rgba(15, 23, 42, 0.85);
+      color: rgba(255, 255, 255, 0.9);
+      padding: 6px 10px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 500;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      border: 1px solid rgba(255,255,255,0.1);
+      cursor: pointer;
+      pointer-events: auto;
+      user-select: none;
+      backdrop-filter: blur(4px);
     `;
+    
     div.textContent = text;
+
+    if (sensorId) {
+      // 整个标签点击触发
+      div.addEventListener('click', (e) => {
+        e.stopPropagation();
+        onSensorClick(sensorId);
+      });
+      // 移除缩放效果，改为简单的亮度变化，避免跳动
+      div.addEventListener('mouseenter', () => div.style.background = 'rgba(15, 23, 42, 0.95)');
+      div.addEventListener('mouseleave', () => div.style.background = 'rgba(15, 23, 42, 0.85)');
+    }
     
     const label = new CSS2DObject(div);
-    label.position.set(position[0], position[1] + 35, position[2]); // 提高到35
+    // 提高标签高度，避免遮挡
+    label.position.set(position[0], position[1] + 15, position[2]); 
     scene.add(label);
     return label;
-  }, []);
+  }, [onSensorClick]);
 
   // 初始化场景
   useEffect(() => {
@@ -819,7 +876,7 @@ const CableNetwork3D: React.FC<CableNetwork3DProps> = ({
     
     SENSORS.forEach(sensor => {
       createSensor(sensor, scene);
-      createLabel(sensor.name, sensor.position, scene);
+      createLabel(sensor.name, sensor.position, scene, sensor.id);
     });
 
     // === 区域空中标签 ===
@@ -886,9 +943,14 @@ const CableNetwork3D: React.FC<CableNetwork3DProps> = ({
       );
       const raycaster = new THREE.Raycaster();
       raycaster.setFromCamera(mouse, camera);
-      const hits = raycaster.intersectObjects(Array.from(sensorMeshesRef.current.values()));
-      if (hits.length > 0 && hits[0].object.userData.sensorId) {
-        onSensorClick(hits[0].object.userData.sensorId);
+      
+      // 递归检测 Group 中的所有子对象
+      const hits = raycaster.intersectObjects(Array.from(sensorMeshesRef.current.values()), true);
+      
+      // 查找第一个带有 sensorId 的对象
+      const hit = hits.find(h => h.object.userData.sensorId);
+      if (hit) {
+        onSensorClick(hit.object.userData.sensorId);
       }
     };
 
@@ -900,10 +962,12 @@ const CableNetwork3D: React.FC<CableNetwork3DProps> = ({
       );
       const raycaster = new THREE.Raycaster();
       raycaster.setFromCamera(mouse, camera);
-      const hits = raycaster.intersectObjects(Array.from(sensorMeshesRef.current.values()));
       
-      if (hits.length > 0 && hits[0].object.userData.sensorId) {
-        hoveredRef.current = hits[0].object.userData.sensorId;
+      const hits = raycaster.intersectObjects(Array.from(sensorMeshesRef.current.values()), true);
+      const hit = hits.find(h => h.object.userData.sensorId);
+      
+      if (hit) {
+        hoveredRef.current = hit.object.userData.sensorId;
         container.style.cursor = 'pointer';
       } else {
         hoveredRef.current = null;

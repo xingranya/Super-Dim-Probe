@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Activity, 
   Thermometer, 
@@ -6,30 +6,88 @@ import {
   Volume2,
   Waves,
   ArrowLeft,
-  AlertTriangle,
-  TrendingUp
+  Magnet,
+  TrendingUp,
+  Layers,
+  Cpu
 } from 'lucide-react';
+import ReactECharts from 'echarts-for-react';
+import * as echarts from 'echarts';
+import CableCrossSection3D from './CableCrossSection3D';
+import { 
+  VoltageWaveform, 
+  MagneticFieldViz, 
+  VibrationWaveform, 
+  AcousticSpectrum, 
+  ThermalGradient 
+} from './DynamicCharts';
 
 /**
- * 传感器监测数据总览仪表盘
- * 点击传感器后显示的多图表界面
+ * 局部放电频谱条组件 - 使用独立状态避免父组件重渲染导致闪烁
  */
+const PDSpectrumBars: React.FC<{ pdValue: number }> = React.memo(({ pdValue }) => {
+  const [bars, setBars] = React.useState<number[]>(() => 
+    Array.from({ length: 20 }, () => Math.random() * 60 + 20)
+  );
+
+  React.useEffect(() => {
+    let frameId: number;
+    let lastUpdate = 0;
+    
+    const updateBars = (timestamp: number) => {
+      // 每 100ms 更新一次，避免过于频繁
+      if (timestamp - lastUpdate > 100) {
+        setBars(prev => prev.map((v, i) => {
+          // 平滑过渡：基于当前值和目标值的插值
+          const target = 20 + Math.random() * 60 * (pdValue / 20);
+          return v + (target - v) * 0.3;
+        }));
+        lastUpdate = timestamp;
+      }
+      frameId = requestAnimationFrame(updateBars);
+    };
+    
+    frameId = requestAnimationFrame(updateBars);
+    return () => cancelAnimationFrame(frameId);
+  }, [pdValue]);
+
+  return (
+    <div className="flex items-end gap-0.5 w-full h-10">
+      {bars.map((height, i) => (
+        <div 
+          key={i} 
+          className="flex-1 bg-purple-500/70 rounded-t-sm"
+          style={{ height: `${Math.max(10, height)}%` }}
+        />
+      ))}
+    </div>
+  );
+});
+PDSpectrumBars.displayName = 'PDSpectrumBars';
 
 interface SensorDashboardProps {
   sensorId: string;
   onBack: () => void;
 }
 
-// 模拟传感器详情数据 - 与CableNetwork3D中的SENSORS保持一致
 const SENSOR_INFO: Record<string, { name: string; location: string; status: string }> = {
-  // 蓝色外环节点
   'S1': { name: '西北枢纽', location: '110kV 主环网 西北角', status: 'normal' },
   'S2': { name: '东北枢纽', location: '110kV 主环网 东北角', status: 'normal' },
   'S3': { name: '西南枢纽', location: '110kV 主环网 西南角', status: 'warning' },
   'S4': { name: '东南枢纽', location: '110kV 主环网 东南角', status: 'normal' },
-  // 绿色十字中心
   'S5': { name: '中央配电站', location: '35kV 配电中心', status: 'fault' },
 };
+
+// Helper for Glassmorphism Cards (Moved outside to prevent re-creation on render)
+const GlassCard = ({ children, className = '' }: { children: React.ReactNode; className?: string }) => (
+  <div className={`relative overflow-hidden rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl shadow-2xl ${className}`}>
+    {/* 光泽效果 */}
+    <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-white/5 to-transparent pointer-events-none" />
+    <div className="relative z-10 p-5 h-full flex flex-col">
+      {children}
+    </div>
+  </div>
+);
 
 const SensorDashboard: React.FC<SensorDashboardProps> = ({ sensorId, onBack }) => {
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -39,10 +97,10 @@ const SensorDashboard: React.FC<SensorDashboardProps> = ({ sensorId, onBack }) =
     temperature: 42.3,
     pd: 15.2,
     vibration: 3.8,
-    acoustic: 28
+    acoustic: 28,
+    magnetic: 450 // uT
   });
 
-  // 模拟实时数据更新
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentTime(new Date());
@@ -52,376 +110,324 @@ const SensorDashboard: React.FC<SensorDashboardProps> = ({ sensorId, onBack }) =
         temperature: +(42.3 + (Math.random() - 0.5) * 2).toFixed(1),
         pd: +(15.2 + (Math.random() - 0.5) * 3).toFixed(1),
         vibration: +(3.8 + (Math.random() - 0.5) * 0.5).toFixed(2),
-        acoustic: Math.round(28 + (Math.random() - 0.5) * 5)
+        acoustic: Math.round(28 + (Math.random() - 0.5) * 5),
+        magnetic: Math.round(450 + (Math.random() - 0.5) * 30)
       }));
     }, 1000);
     return () => clearInterval(timer);
   }, []);
 
-  const sensorInfo = SENSOR_INFO[sensorId] || { name: '未知传感器', location: '未知位置', status: 'normal' };
-
-  // 波形数据生成
-  const generateWaveData = (points: number, amplitude: number, offset: number) => {
-    const data = [];
-    for (let i = 0; i < points; i++) {
-      data.push(Math.sin(i * 0.1 + offset) * amplitude + (Math.random() - 0.5) * amplitude * 0.3);
-    }
-    return data;
-  };
-
-  // SVG波形路径
-  const createWavePath = (data: number[], width: number, height: number, baseline: number) => {
-    const step = width / (data.length - 1);
-    return data.map((v, i) => `${i === 0 ? 'M' : 'L'} ${i * step} ${baseline - v}`).join(' ');
-  };
-
-  // 恢复原始波形数据生成
-  const waveData1 = generateWaveData(50, 20, Date.now() * 0.001);
-  const waveData2 = generateWaveData(50, 15, Date.now() * 0.002);
+const sensorInfo = SENSOR_INFO[sensorId] || { name: '未知传感器', location: '未知位置', status: 'normal' };
 
   return (
-    <div className="w-full h-screen bg-[#0a0f1a] text-white overflow-y-auto overflow-x-hidden">
+    <div className="w-full h-screen bg-[#020617] text-white overflow-hidden font-sans selection:bg-indigo-500/30">
+      {/* 背景光效 */}
+      <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-indigo-600/20 rounded-full blur-[120px] pointer-events-none" />
+      <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] bg-cyan-600/20 rounded-full blur-[120px] pointer-events-none" />
+
       {/* 顶部导航 */}
-      <header className="sticky top-0 z-10 bg-[#0a0f1a]/95 backdrop-blur border-b border-slate-800 px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <button 
-              onClick={onBack}
-              className="p-2 hover:bg-slate-800 rounded-lg transition-colors"
-            >
-              <ArrowLeft size={20} />
-            </button>
-            <div>
-              <h1 className="text-xl font-bold text-cyan-400">{sensorInfo.name}</h1>
-              <p className="text-sm text-slate-400">{sensorInfo.location}</p>
+      <header className="relative z-20 flex items-center justify-between px-8 py-6 h-[100px]">
+        <div className="flex items-center gap-6">
+          <button 
+            onClick={onBack}
+            className="group p-3 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/20 transition-all duration-300 backdrop-blur-md"
+          >
+            <ArrowLeft size={20} className="text-slate-300 group-hover:text-white transition-colors" />
+          </button>
+          <div>
+            <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-400">
+              {sensorInfo.name}
+            </h1>
+            <div className="flex items-center gap-2 mt-1">
+              <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
+              <p className="text-sm text-indigo-200/80 font-medium tracking-wide">{sensorInfo.location}</p>
             </div>
           </div>
-          <div className="flex items-center gap-4">
-            <div className={`px-3 py-1 rounded-full text-xs font-medium ${
-              sensorInfo.status === 'normal' ? 'bg-emerald-900/50 text-emerald-400' :
-              sensorInfo.status === 'warning' ? 'bg-amber-900/50 text-amber-400' :
-              'bg-red-900/50 text-red-400'
-            }`}>
-              {sensorInfo.status === 'normal' ? '● 运行正常' : 
-               sensorInfo.status === 'warning' ? '● 预警状态' : '● 故障告警'}
+        </div>
+
+        <div className="flex items-center gap-6">
+          <div className={`px-4 py-1.5 rounded-full text-sm font-semibold border backdrop-blur-md flex items-center gap-2 ${
+            sensorInfo.status === 'normal' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' :
+            sensorInfo.status === 'warning' ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' :
+            'bg-red-500/10 border-red-500/20 text-red-400'
+          }`}>
+            <span className={`w-2 h-2 rounded-full ${
+              sensorInfo.status === 'normal' ? 'bg-emerald-400' :
+              sensorInfo.status === 'warning' ? 'bg-amber-400' : 'bg-red-400'
+            } animate-pulse`} />
+            {sensorInfo.status === 'normal' ? '系统正常' : 
+             sensorInfo.status === 'warning' ? '系统预警' : '系统故障'}
+          </div>
+          <div className="text-right">
+            <div className="text-2xl font-mono font-bold text-slate-200">
+              {currentTime.toLocaleTimeString('zh-CN', { hour12: false })}
             </div>
-            <div className="text-sm text-slate-400 font-mono">
-              {currentTime.toLocaleTimeString('zh-CN')}
-            </div>
+            <div className="text-xs text-slate-500 font-medium tracking-wider uppercase">实时监测中</div>
           </div>
         </div>
       </header>
 
-      {/* 主内容区 */}
-      <main className="p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* 电学监测卡片 */}
-        <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-5">
-          <div className="flex items-center gap-2 mb-4">
-            <div className="p-2 bg-blue-600/20 rounded-lg">
-              <Zap size={18} className="text-blue-400" />
+      {/* 主内容网格 */}
+      <main className="relative z-10 px-8 pb-8 h-[calc(100vh-100px)] grid grid-cols-12 grid-rows-2 gap-6">
+        
+        {/* 左侧：数字孪生 (3D Cross Section) */}
+        <div className="col-span-4 row-span-2 min-h-[500px]">
+          <GlassCard className="!p-0 relative group h-full">
+            <div className="absolute top-6 left-6 z-20 pointer-events-none">
+              <div className="flex items-center gap-2 mb-1">
+                <div className="p-2 bg-indigo-500/20 rounded-lg backdrop-blur-md">
+                  <Layers size={20} className="text-indigo-400" />
+                </div>
+                <h2 className="text-lg font-bold text-white">数字孪生</h2>
+              </div>
+              <p className="text-xs text-slate-400 max-w-[200px]">电缆内部结构与热力状态实时3D可视化</p>
             </div>
-            <h2 className="font-bold">电学状态监测</h2>
-          </div>
-          
-          <div className="space-y-4">
-            <div className="flex justify-between items-end">
-              <div>
-                <div className="text-xs text-slate-400">工作电压</div>
-                <div className="text-2xl font-mono font-bold text-blue-400">
-                  {animatedValues.voltage} <span className="text-sm">kV</span>
+            
+            {/* 3D View - 使用 absolute inset-0 确保填满容器 */}
+            <div className="absolute inset-0 z-10 bg-gradient-to-b from-slate-900/50 to-slate-950/50">
+              <CableCrossSection3D 
+                temperature={animatedValues.temperature} 
+                load={animatedValues.current / 500 * 100} 
+              />
+            </div>
+
+            {/* 底部图例 */}
+            <div className="absolute bottom-6 left-6 right-6 z-20 flex justify-between items-end pointer-events-none">
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-xs text-slate-300">
+                  <span className="w-3 h-3 rounded-full bg-[#ffdf00] shadow-[0_0_10px_#ffdf00]" /> 导体
+                </div>
+                <div className="flex items-center gap-2 text-xs text-slate-300">
+                  <span className="w-3 h-3 rounded-full bg-[#e2e8f0]/50" /> 绝缘层
+                </div>
+                <div className="flex items-center gap-2 text-xs text-slate-300">
+                  <span className="w-3 h-3 rounded-full bg-[#b87333]" /> 屏蔽层
                 </div>
               </div>
               <div className="text-right">
-                <div className="text-xs text-slate-400">负载电流</div>
-                <div className="text-2xl font-mono font-bold text-cyan-400">
-                  {animatedValues.current} <span className="text-sm">A</span>
-                </div>
+                 <div className="text-xs text-slate-500 mb-1">线芯温度</div>
+                 <div className="text-3xl font-mono font-bold text-orange-400 drop-shadow-lg">
+                   {animatedValues.temperature}°C
+                 </div>
               </div>
             </div>
-            
-            {/* 电压波形 */}
-            <div className="bg-slate-800/50 rounded-lg p-3">
-              <div className="text-xs text-slate-500 mb-2">电压波形</div>
-              <svg className="w-full h-16" viewBox="0 0 200 60">
-                <path 
-                  d={createWavePath(waveData1, 200, 60, 30)} 
-                  fill="none" 
-                  stroke="#3b82f6" 
-                  strokeWidth="2"
-                />
-              </svg>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 text-sm">
-              <div className="bg-slate-800/30 p-2 rounded">
-                <div className="text-xs text-slate-500">功率因数</div>
-                <div className="font-mono text-slate-300">0.92</div>
-              </div>
-              <div className="bg-slate-800/30 p-2 rounded">
-                <div className="text-xs text-slate-500">有功功率</div>
-                <div className="font-mono text-slate-300">48.5 MW</div>
-              </div>
-            </div>
-          </div>
+          </GlassCard>
         </div>
 
-        {/* 热学监测卡片 */}
-        <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-5">
-          <div className="flex items-center gap-2 mb-4">
-            <div className="p-2 bg-orange-600/20 rounded-lg">
-              <Thermometer size={18} className="text-orange-400" />
-            </div>
-            <h2 className="font-bold">热学状态监测</h2>
-          </div>
-          
-          <div className="space-y-4">
-            <div className="flex justify-between items-end">
-              <div>
-                <div className="text-xs text-slate-400">线芯温度</div>
-                <div className="text-2xl font-mono font-bold text-orange-400">
-                  {animatedValues.temperature} <span className="text-sm">°C</span>
+        {/* 中间：核心指标 (5个维度) */}
+        <div className="col-span-5 row-span-2 grid grid-rows-3 gap-6">
+          {/* 1. 电学 (Voltage & Current) */}
+          {/* 1. 局部放电监测 (原电学位置) */}
+          {/* 1. 局部放电监测 (原电学位置) */}
+          <GlassCard className="row-span-1 relative overflow-hidden !p-3">
+            {/* 数据显示区域 */}
+            <div className="flex items-start justify-between mb-2">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-purple-500/20 rounded-xl">
+                  <Activity size={20} className="text-purple-400" />
                 </div>
-              </div>
-              <div className="text-right">
-                <div className="text-xs text-slate-400">环境温度</div>
-                <div className="text-lg font-mono text-slate-400">
-                  25.8 <span className="text-sm">°C</span>
-                </div>
-              </div>
-            </div>
-            
-            {/* 温度梯度条 */}
-            <div className="bg-slate-800/50 rounded-lg p-3">
-              <div className="text-xs text-slate-500 mb-2">温度分布</div>
-              <div className="h-8 rounded-lg overflow-hidden" style={{
-                background: 'linear-gradient(to right, #3b82f6, #22c55e, #eab308, #ef4444)'
-              }}>
-                <div 
-                  className="h-full w-1 bg-white shadow-lg"
-                  style={{ marginLeft: `${(animatedValues.temperature / 80) * 100}%` }}
-                />
-              </div>
-              <div className="flex justify-between text-xs text-slate-500 mt-1">
-                <span>0°C</span>
-                <span>80°C</span>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 text-sm">
-              <div className="bg-slate-800/30 p-2 rounded">
-                <div className="text-xs text-slate-500">最高温度</div>
-                <div className="font-mono text-orange-300">58.2°C</div>
-              </div>
-              <div className="bg-slate-800/30 p-2 rounded">
-                <div className="text-xs text-slate-500">温升速率</div>
-                <div className="font-mono text-slate-300">+0.3°C/h</div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* 局部放电监测卡片 */}
-        <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-5">
-          <div className="flex items-center gap-2 mb-4">
-            <div className="p-2 bg-purple-600/20 rounded-lg">
-              <Activity size={18} className="text-purple-400" />
-            </div>
-            <h2 className="font-bold">局部放电监测</h2>
-          </div>
-          
-          <div className="space-y-4">
-            <div className="flex justify-between items-end">
-              <div>
-                <div className="text-xs text-slate-400">放电幅值</div>
-                <div className="text-2xl font-mono font-bold text-purple-400">
-                  {animatedValues.pd} <span className="text-sm">pC</span>
-                </div>
-              </div>
-              <div className="text-right">
-                <div className="text-xs text-slate-400">脉冲计数</div>
-                <div className="text-lg font-mono text-slate-400">
-                  156 <span className="text-sm">pps</span>
-                </div>
-              </div>
-            </div>
-            
-            {/* 频谱柱状图 */}
-            <div className="bg-slate-800/50 rounded-lg p-3">
-              <div className="text-xs text-slate-500 mb-2">局放频谱</div>
-              <div className="flex items-end gap-1 h-12">
-                {[0.6, 0.8, 1, 0.7, 0.5, 0.9, 0.4, 0.6, 0.3, 0.5, 0.2, 0.4].map((h, i) => (
-                  <div 
-                    key={i}
-                    className="flex-1 bg-purple-500 rounded-t transition-all duration-300"
-                    style={{ height: `${h * 100 * (0.8 + Math.random() * 0.4)}%` }}
-                  />
-                ))}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 text-sm">
-              <div className="bg-slate-800/30 p-2 rounded">
-                <div className="text-xs text-slate-500">主频点</div>
-                <div className="font-mono text-slate-300">125 kHz</div>
-              </div>
-              <div className="bg-slate-800/30 p-2 rounded">
-                <div className="text-xs text-slate-500">趋势</div>
-                <div className="font-mono text-emerald-400 flex items-center gap-1">
-                  <TrendingUp size={12} /> 稳定
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* 振动监测卡片 */}
-        <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-5">
-          <div className="flex items-center gap-2 mb-4">
-            <div className="p-2 bg-cyan-600/20 rounded-lg">
-              <Waves size={18} className="text-cyan-400" />
-            </div>
-            <h2 className="font-bold">振动状态监测</h2>
-          </div>
-          
-          <div className="space-y-4">
-            <div>
-              <div className="text-xs text-slate-400">振动幅值 (RMS)</div>
-              <div className="text-2xl font-mono font-bold text-cyan-400">
-                {animatedValues.vibration} <span className="text-sm">mm/s</span>
-              </div>
-            </div>
-            
-            {/* 振动波形 */}
-            <div className="bg-slate-800/50 rounded-lg p-3">
-              <div className="text-xs text-slate-500 mb-2">时域波形</div>
-              <svg className="w-full h-16" viewBox="0 0 200 60">
-                <line x1="0" y1="30" x2="200" y2="30" stroke="#334155" strokeWidth="1" />
-                <path 
-                  d={createWavePath(waveData2, 200, 60, 30)} 
-                  fill="none" 
-                  stroke="#06b6d4" 
-                  strokeWidth="2"
-                />
-              </svg>
-            </div>
-
-            <div className="grid grid-cols-3 gap-2 text-sm">
-              <div className="bg-slate-800/30 p-2 rounded text-center">
-                <div className="text-xs text-slate-500">X轴</div>
-                <div className="font-mono text-slate-300">2.1</div>
-              </div>
-              <div className="bg-slate-800/30 p-2 rounded text-center">
-                <div className="text-xs text-slate-500">Y轴</div>
-                <div className="font-mono text-slate-300">1.8</div>
-              </div>
-              <div className="bg-slate-800/30 p-2 rounded text-center">
-                <div className="text-xs text-slate-500">Z轴</div>
-                <div className="font-mono text-slate-300">2.5</div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* 声学监测卡片 */}
-        <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-5">
-          <div className="flex items-center gap-2 mb-4">
-            <div className="p-2 bg-green-600/20 rounded-lg">
-              <Volume2 size={18} className="text-green-400" />
-            </div>
-            <h2 className="font-bold">声学状态监测</h2>
-          </div>
-          
-          <div className="space-y-4">
-            <div>
-              <div className="text-xs text-slate-400">超声幅值</div>
-              <div className="text-2xl font-mono font-bold text-green-400">
-                {animatedValues.acoustic} <span className="text-sm">dB</span>
-              </div>
-            </div>
-            
-            {/* 声学频谱 */}
-            <div className="bg-slate-800/50 rounded-lg p-3">
-              <div className="text-xs text-slate-500 mb-2">频谱分析</div>
-              <div className="flex items-end gap-0.5 h-12">
-                {Array.from({ length: 24 }, (_, i) => {
-                  const val = Math.random() * 0.5 + (i < 8 ? 0.5 : i < 16 ? 0.3 : 0.1);
-                  return (
-                    <div 
-                      key={i}
-                      className="flex-1 bg-green-500 rounded-t transition-all duration-300"
-                      style={{ 
-                        height: `${val * 100}%`,
-                        opacity: 0.4 + val * 0.6
-                      }}
-                    />
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 text-sm">
-              <div className="bg-slate-800/30 p-2 rounded">
-                <div className="text-xs text-slate-500">检测频段</div>
-                <div className="font-mono text-slate-300">20-100 kHz</div>
-              </div>
-              <div className="bg-slate-800/30 p-2 rounded">
-                <div className="text-xs text-slate-500">背景噪声</div>
-                <div className="font-mono text-slate-300">18 dB</div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* 综合健康评估卡片 */}
-        <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-5">
-          <div className="flex items-center gap-2 mb-4">
-            <div className="p-2 bg-emerald-600/20 rounded-lg">
-              <AlertTriangle size={18} className="text-emerald-400" />
-            </div>
-            <h2 className="font-bold">综合健康评估</h2>
-          </div>
-          
-          <div className="space-y-4">
-            <div className="flex items-center gap-4">
-              <div className="relative w-20 h-20">
-                <svg className="w-full h-full transform -rotate-90">
-                  <circle cx="40" cy="40" r="35" fill="none" stroke="#1e293b" strokeWidth="6" />
-                  <circle 
-                    cx="40" cy="40" r="35" fill="none" 
-                    stroke="#22c55e" strokeWidth="6"
-                    strokeDasharray={`${94 * 2.2} ${100 * 2.2}`}
-                    strokeLinecap="round"
-                  />
-                </svg>
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="text-xl font-bold text-emerald-400">94%</span>
-                </div>
-              </div>
-              <div>
-                <div className="text-sm text-slate-400">健康指数</div>
-                <div className="text-lg font-bold text-emerald-400">优良</div>
-                <div className="text-xs text-slate-500">预计剩余寿命: 28.5年</div>
-              </div>
-            </div>
-            
-            <div className="space-y-2">
-              {[
-                { label: '电气状态', value: 96, color: 'bg-blue-500' },
-                { label: '热学状态', value: 92, color: 'bg-orange-500' },
-                { label: '绝缘状态', value: 94, color: 'bg-purple-500' },
-                { label: '机械状态', value: 98, color: 'bg-cyan-500' }
-              ].map(item => (
-                <div key={item.label} className="flex items-center gap-2">
-                  <span className="text-xs text-slate-400 w-16">{item.label}</span>
-                  <div className="flex-1 h-2 bg-slate-800 rounded-full overflow-hidden">
-                    <div className={`h-full ${item.color} rounded-full`} style={{ width: `${item.value}%` }} />
+                <div>
+                  <div className="text-xs text-slate-400">局部放电强度</div>
+                  <div className="text-2xl font-mono font-bold text-white">
+                    {animatedValues.pd} <span className="text-sm text-slate-500">pC</span>
                   </div>
-                  <span className="text-xs font-mono text-slate-300 w-8">{item.value}%</span>
                 </div>
-              ))}
+              </div>
+              <div className="text-right">
+                <div className="flex items-center gap-2 text-[10px] text-slate-500 font-mono mb-1">
+                  <Zap size={10} />{animatedValues.current}A | {animatedValues.voltage}kV
+                </div>
+                <div className="text-xs text-slate-400">放电频次</div>
+                <div className="text-xl font-mono font-bold text-purple-400">
+                  156 <span className="text-xs text-slate-500">次/min</span>
+                </div>
+              </div>
             </div>
+            
+            {/* 频谱图 - 增大高度 */}
+            <div className="h-12 bg-slate-900/40 rounded-lg px-2 py-1">
+              <PDSpectrumBars pdValue={animatedValues.pd} />
+            </div>
+          </GlassCard>
+
+          {/* 2. 磁场 & 热学 (Magnetic & Thermal) */}
+          <div className="row-span-1 grid grid-cols-2 gap-6">
+             {/* 磁场 */}
+            <GlassCard>
+              <div className="flex justify-between items-start mb-2">
+                <div className="flex items-center gap-2">
+                  <Magnet size={18} className="text-pink-400" />
+                  <h3 className="font-semibold text-slate-200">磁场强度</h3>
+                </div>
+                <div className="text-xl font-mono font-bold text-pink-400">
+                  {animatedValues.magnetic} <span className="text-xs text-slate-500">uT</span>
+                </div>
+              </div>
+              {/* 动态磁场可视化 */}
+              <div className="flex-1 relative flex items-center justify-center overflow-hidden rounded-lg bg-pink-900/10">
+                 <MagneticFieldViz intensity={animatedValues.magnetic} />
+              </div>
+            </GlassCard>
+
+            {/* 热学分布 (原局放位置) */}
+            <GlassCard>
+              <div className="flex justify-between items-start mb-2">
+                <div className="flex items-center gap-2">
+                  <Thermometer size={18} className="text-orange-400" />
+                  <h3 className="font-semibold text-slate-200">热学分布</h3>
+                </div>
+                <div className="text-xl font-mono font-bold text-orange-400">
+                  {animatedValues.temperature} <span className="text-xs text-slate-500">°C</span>
+                </div>
+              </div>
+              <div className="flex-1 flex flex-col justify-center gap-2">
+                 <ThermalGradient temp={animatedValues.temperature} />
+                 <div className="flex justify-between text-[10px] text-slate-500 px-1">
+                    <span>光纤测温</span>
+                    <span>实时分布</span>
+                 </div>
+              </div>
+            </GlassCard>
+          </div>
+
+          {/* 3. 振动 & 声学 (Vibration & Acoustic) */}
+          <div className="row-span-1 grid grid-cols-2 gap-6">
+            <GlassCard>
+              <div className="flex items-center gap-2 mb-2">
+                <Waves size={16} className="text-cyan-400" />
+                <h3 className="text-sm font-semibold text-slate-300">机械振动</h3>
+              </div>
+              <div className="mt-auto">
+                <div className="text-2xl font-mono font-bold text-white">
+                  {animatedValues.vibration} <span className="text-xs text-slate-500">mm/s</span>
+                </div>
+                {/* 动态波形 */}
+                <div className="w-full h-12 mt-2 flex items-center gap-0.5 overflow-hidden">
+                   <VibrationWaveform amplitude={animatedValues.vibration} />
+                </div>
+              </div>
+            </GlassCard>
+            <GlassCard>
+              <div className="flex items-center gap-2 mb-2">
+                <Volume2 size={16} className="text-emerald-400" />
+                <h3 className="text-sm font-semibold text-slate-300">声学信号</h3>
+              </div>
+              <div className="mt-auto">
+                <div className="text-2xl font-mono font-bold text-white">
+                  {animatedValues.acoustic} <span className="text-xs text-slate-500">dB</span>
+                </div>
+                <div className="w-full h-12 mt-2 rounded-lg overflow-hidden">
+                  <AcousticSpectrum />
+                </div>
+              </div>
+            </GlassCard>
           </div>
         </div>
+
+        {/* 右侧：健康评估 & 详情 */}
+        <div className="col-span-3 row-span-2 grid grid-rows-[1fr_auto] gap-4">
+          <GlassCard className="flex flex-col min-h-0 overflow-hidden">
+            <div className="flex items-center gap-2 mb-2 flex-none">
+              <div className="p-2 bg-emerald-500/20 rounded-lg">
+                <Cpu size={20} className="text-emerald-400" />
+              </div>
+              <h2 className="font-bold text-lg">AI 智能诊断</h2>
+            </div>
+
+            <div className="flex-1 flex flex-col relative">
+              {/* 顶部：环形评分 */}
+              <div className="flex items-center justify-center py-2 flex-none">
+                <div className="relative">
+                  <svg className="w-28 h-28 transform -rotate-90">
+                    <circle cx="56" cy="56" r="48" fill="none" stroke="#1e293b" strokeWidth="8" />
+                    <circle 
+                      cx="56" cy="56" r="48" fill="none" 
+                      stroke="#10b981" strokeWidth="8"
+                      strokeDasharray={`${94 * 3} ${100 * 3}`}
+                      strokeLinecap="round"
+                      className="drop-shadow-[0_0_10px_rgba(16,185,129,0.5)]"
+                    />
+                  </svg>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center">
+                    <div className="text-3xl font-bold text-white">94<span className="text-sm">%</span></div>
+                    <div className="text-[10px] text-emerald-400 font-medium uppercase tracking-wider">健康评分</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 中部：ECharts 雷达图 */}
+              <div className="flex-1 min-h-0 -mt-4">
+                <ReactECharts 
+                  option={{
+                    backgroundColor: 'transparent',
+                    radar: {
+                      indicator: [
+                        { name: '电气', max: 100 },
+                        { name: '热学', max: 100 },
+                        { name: '机械', max: 100 },
+                        { name: '化学', max: 100 },
+                        { name: '环境', max: 100 },
+                        { name: '寿命', max: 100 }
+                      ],
+                      center: ['50%', '55%'],
+                      radius: '65%',
+                      splitNumber: 3,
+                      axisName: { color: '#94a3b8', fontSize: 10 },
+                      splitLine: { lineStyle: { color: 'rgba(255, 255, 255, 0.05)' } },
+                      splitArea: { show: false },
+                      axisLine: { lineStyle: { color: 'rgba(255, 255, 255, 0.05)' } },
+                      axisLabel: { show: false }
+                    },
+                    series: [{
+                      type: 'radar',
+                      data: [{
+                        value: [96, 92, 98, 85, 90, 88],
+                        name: '健康状态',
+                        symbol: 'none',
+                        lineStyle: { width: 2, color: '#10b981' },
+                        areaStyle: {
+                          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                            { offset: 0, color: 'rgba(16, 185, 129, 0.4)' },
+                            { offset: 1, color: 'rgba(16, 185, 129, 0.05)' }
+                          ])
+                        }
+                      }]
+                    }]
+                  }}
+                  style={{ height: '100%', width: '100%' }}
+                  opts={{ renderer: 'canvas' }}
+                />
+              </div>
+
+              {/* 底部：模型信息 */}
+              <div className="flex-none pt-2 border-t border-white/5">
+                <div className="flex justify-between text-[10px] text-slate-400">
+                  <span>模型: Transformer-v4</span>
+                  <span>置信度: <span className="text-emerald-400">98.2%</span></span>
+                </div>
+              </div>
+            </div>
+          </GlassCard>
+
+          {/* 生成报告 - 紧凑单行 */}
+          <GlassCard className="!py-2.5 !px-4 group cursor-pointer hover:bg-white/10 transition-all">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-indigo-500/20 flex-shrink-0">
+                <TrendingUp size={16} className="text-indigo-400" />
+              </div>
+              <span className="font-semibold text-white text-sm whitespace-nowrap">生成报告</span>
+              <span className="text-[10px] text-slate-500 whitespace-nowrap">10分钟前</span>
+              <div className="flex-1" />
+              <button className="py-1 px-2.5 rounded bg-indigo-500/20 text-indigo-300 text-xs font-medium hover:bg-indigo-500/30">
+                PDF
+              </button>
+              <button className="py-1 px-2.5 rounded bg-slate-700/50 text-slate-400 text-xs font-medium hover:bg-slate-600/50">
+                Excel
+              </button>
+            </div>
+          </GlassCard>
+        </div>
+
       </main>
     </div>
   );
