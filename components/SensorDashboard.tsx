@@ -76,6 +76,14 @@ const SENSOR_INFO: Record<string, { name: string; location: string; status: stri
   'S3': { name: '西南枢纽', location: '110kV 主环网 西南角', status: 'warning' },
   'S4': { name: '东南枢纽', location: '110kV 主环网 东南角', status: 'normal' },
   'S5': { name: '中央配电站', location: '35kV 配电中心', status: 'fault' },
+  'S6': { name: '北侧交汇点', location: '35kV线路与110kV环网 北侧交叉', status: 'normal' },
+  'S7': { name: '南侧交汇点', location: '35kV线路与110kV环网 南侧交叉', status: 'normal' },
+  'S8': { name: '西侧端点', location: '35kV联络线 西端', status: 'normal' },
+  'S9': { name: '东侧端点', location: '35kV联络线 东端', status: 'warning' },
+  'S10': { name: '西北管沟', location: '低压通信管线 西北拐点', status: 'normal' },
+  'S11': { name: '东北管沟', location: '低压通信管线 东北拐点', status: 'normal' },
+  'S12': { name: '西南管沟', location: '低压通信管线 西南拐点', status: 'normal' },
+  'S13': { name: '东南管沟', location: '低压通信管线 东南拐点', status: 'normal' },
 };
 
 // Helper for Glassmorphism Cards (Moved outside to prevent re-creation on render)
