@@ -112,65 +112,66 @@ interface CableRoute {
   segments: CableSegment[];
 }
 
-// 电缆布局：沿道路边缘，互不交叉 (加大尺寸)
+// 电缆布局：沿道路边缘，悬空架设
 const ROAD_OFFSET = 3; // 电缆距离道路中心的偏移
+const CABLE_HEIGHT = 1.5; // 电缆悬空高度 (降低高度，更贴近地面)
 
 const CABLE_ROUTES: CableRoute[] = [
   // ========== 蓝色外环 (110kV) ==========
   {
     id: 'blue-ring-top',
     color: '#4A90D9',
-    thickness: 1.2,  // 加大
-    height: 0.6,
+    thickness: 1.2, // 加粗
+    height: CABLE_HEIGHT,
     segments: [
-      { start: [-60, 0.6, -20 - ROAD_OFFSET], end: [60, 0.6, -20 - ROAD_OFFSET] },
+      { start: [-60, CABLE_HEIGHT, -20 - ROAD_OFFSET], end: [60, CABLE_HEIGHT, -20 - ROAD_OFFSET] },
     ]
   },
   {
     id: 'blue-ring-bottom',
     color: '#4A90D9',
-    thickness: 1.2,
-    height: 0.6,
+    thickness: 1.2, // 加粗
+    height: CABLE_HEIGHT,
     segments: [
-      { start: [-60, 0.6, 20 + ROAD_OFFSET], end: [60, 0.6, 20 + ROAD_OFFSET] },
+      { start: [-60, CABLE_HEIGHT, 20 + ROAD_OFFSET], end: [60, CABLE_HEIGHT, 20 + ROAD_OFFSET] },
     ]
   },
   {
     id: 'blue-ring-left',
     color: '#4A90D9',
-    thickness: 1.2,
-    height: 0.6,
+    thickness: 1.2, // 加粗
+    height: CABLE_HEIGHT,
     segments: [
-      { start: [-20 - ROAD_OFFSET, 0.6, -20 - ROAD_OFFSET], end: [-20 - ROAD_OFFSET, 0.6, 20 + ROAD_OFFSET] },
+      { start: [-20 - ROAD_OFFSET, CABLE_HEIGHT, -20 - ROAD_OFFSET], end: [-20 - ROAD_OFFSET, CABLE_HEIGHT, 20 + ROAD_OFFSET] },
     ]
   },
   {
     id: 'blue-ring-right',
     color: '#4A90D9',
-    thickness: 1.2,
-    height: 0.6,
+    thickness: 1.2, // 加粗
+    height: CABLE_HEIGHT,
     segments: [
-      { start: [20 + ROAD_OFFSET, 0.6, -20 - ROAD_OFFSET], end: [20 + ROAD_OFFSET, 0.6, 20 + ROAD_OFFSET] },
+      { start: [20 + ROAD_OFFSET, CABLE_HEIGHT, -20 - ROAD_OFFSET], end: [20 + ROAD_OFFSET, CABLE_HEIGHT, 20 + ROAD_OFFSET] },
     ]
   },
-  
-  // ========== 绿色十字 (35kV) - 高度0.9，在蓝色上方通过 ==========
+
+  // ========== 绿色十字 (35kV) ==========
   {
     id: 'green-cross-h',
     color: '#5CB85C',
-    thickness: 1.0,  // 加大
-    height: 0.9,
+    thickness: 1.0, // 加粗
+    height: CABLE_HEIGHT + 0.5,
     segments: [
-      { start: [-60, 0.9, ROAD_OFFSET], end: [60, 0.9, ROAD_OFFSET] },
+      { start: [-60, CABLE_HEIGHT + 0.5, ROAD_OFFSET], end: [60, CABLE_HEIGHT + 0.5, ROAD_OFFSET] },
     ]
   },
   {
     id: 'green-cross-v',
     color: '#5CB85C',
-    thickness: 1.0,
-    height: 0.9,
+    thickness: 1.0, // 加粗
+    height: CABLE_HEIGHT + 0.5,
     segments: [
-      { start: [ROAD_OFFSET, 0.9, -60], end: [ROAD_OFFSET, 0.9, 60] },
+      { start: [ROAD_OFFSET, CABLE_HEIGHT + 0.5, -60], end: [ROAD_OFFSET, CABLE_HEIGHT + 0.5, 60] },
     ]
   },
 ];
@@ -184,13 +185,13 @@ interface Sensor {
 }
 
 const SENSORS: Sensor[] = [
-  // 蓝色环节点
-  { id: 'S1', position: [-20 - ROAD_OFFSET, 0, -20 - ROAD_OFFSET], name: '西北枢纽', status: 'normal' },
-  { id: 'S2', position: [20 + ROAD_OFFSET, 0, -20 - ROAD_OFFSET], name: '东北枢纽', status: 'normal' },
-  { id: 'S3', position: [-20 - ROAD_OFFSET, 0, 20 + ROAD_OFFSET], name: '西南枢纽', status: 'warning' },
-  { id: 'S4', position: [20 + ROAD_OFFSET, 0, 20 + ROAD_OFFSET], name: '东南枢纽', status: 'normal' },
+  // 蓝色环节点 - 位于电缆高度
+  { id: 'S1', position: [-20 - ROAD_OFFSET, CABLE_HEIGHT, -20 - ROAD_OFFSET], name: '西北枢纽', status: 'normal' },
+  { id: 'S2', position: [20 + ROAD_OFFSET, CABLE_HEIGHT, -20 - ROAD_OFFSET], name: '东北枢纽', status: 'normal' },
+  { id: 'S3', position: [-20 - ROAD_OFFSET, CABLE_HEIGHT, 20 + ROAD_OFFSET], name: '西南枢纽', status: 'warning' },
+  { id: 'S4', position: [20 + ROAD_OFFSET, CABLE_HEIGHT, 20 + ROAD_OFFSET], name: '东南枢纽', status: 'normal' },
   // 绿色十字中心
-  { id: 'S5', position: [ROAD_OFFSET, 0, ROAD_OFFSET], name: '中央配电站', status: 'fault' },
+  { id: 'S5', position: [ROAD_OFFSET, CABLE_HEIGHT + 0.5, ROAD_OFFSET], name: '中央配电站', status: 'fault' },
 ];
 
 // ============================================================
@@ -361,7 +362,7 @@ const CableNetwork3D: React.FC<CableNetwork3DProps> = ({
     return group;
   }, []);
   // 创建电缆 (Phase 9 Pro Max - 真实多层结构+工业质感)
-  const createCable = useCallback((segment: CableSegment, color: string, thickness: number, scene: THREE.Scene) => {
+  const createCable = useCallback((segment: CableSegment, _color: string, thickness: number, scene: THREE.Scene) => {
     const start = new THREE.Vector3(...segment.start);
     const end = new THREE.Vector3(...segment.end);
     const length = start.distanceTo(end);
@@ -379,7 +380,7 @@ const CableNetwork3D: React.FC<CableNetwork3DProps> = ({
     if (nCtx) {
       nCtx.fillStyle = '#8080ff'; // 默认法线颜色
       nCtx.fillRect(0, 0, 256, 256);
-      
+
       // 绘制螺旋条纹
       for (let i = -100; i < 356; i += 20) {
         nCtx.beginPath();
@@ -426,7 +427,7 @@ const CableNetwork3D: React.FC<CableNetwork3DProps> = ({
       clearcoatRoughness: 0.4,
     });
     const sheath = new THREE.Mesh(sheathGeo, sheathMat);
-    
+
     // 旋转对齐
     const quaternion = new THREE.Quaternion();
     quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction);
@@ -461,14 +462,12 @@ const CableNetwork3D: React.FC<CableNetwork3DProps> = ({
       ];
 
       // 在两端创建层级结构
-      [start, end].forEach((pos, idx) => {
+      [start, end].forEach((_pos, idx) => {
         const offset = idx === 0 ? 1 : -1;
-        // 稍微缩进一点，避免完全重叠
-        const layerCenter = new THREE.Vector3().copy(pos).add(direction.clone().multiplyScalar(offset * 0.5));
-        
+
         layers.forEach((layer, i) => {
           // 层级递进露出
-          const layerLen = 1.5 + i * 0.5; 
+          const layerLen = 1.5 + i * 0.5;
           const geo = new THREE.CylinderGeometry(layer.r, layer.r, layerLen, 24);
           const mat = new THREE.MeshPhysicalMaterial({
             color: layer.color,
@@ -481,7 +480,7 @@ const CableNetwork3D: React.FC<CableNetwork3DProps> = ({
           const mesh = new THREE.Mesh(geo, mat);
           mesh.setRotationFromQuaternion(quaternion);
           // 调整位置使其从端口伸出
-          const shift = direction.clone().multiplyScalar(offset * (length / 2 - layerLen / 2 + i * 0.2)); 
+          const shift = direction.clone().multiplyScalar(offset * (length / 2 - layerLen / 2 + i * 0.2));
           mesh.position.copy(center).add(shift);
           group.add(mesh);
         });
@@ -492,7 +491,7 @@ const CableNetwork3D: React.FC<CableNetwork3DProps> = ({
     const ringCount = Math.floor(length / 8);
     const ringGeo = new THREE.BoxGeometry(thickness * 2.5, thickness * 0.5, thickness * 0.8);
     const ringMat = new THREE.MeshStandardMaterial({ color: '#475569', roughness: 0.5, metalness: 0.8 });
-    
+
     for (let i = 1; i <= ringCount; i++) {
       const t = i / (ringCount + 1);
       const pos = new THREE.Vector3().lerpVectors(start, end, t);
@@ -506,97 +505,148 @@ const CableNetwork3D: React.FC<CableNetwork3DProps> = ({
     // 在起点和终点添加与护套同材质的球体，解决圆柱体拼接时的缝隙和锐角问题
     const jointSphereGeo = new THREE.SphereGeometry(thickness, 24, 24);
     // 复用护套材质
-    const startJoint = new THREE.Mesh(jointSphereGeo, sheathMat);
-    startJoint.position.copy(start);
-    group.add(startJoint);
+    const jointStart = new THREE.Mesh(jointSphereGeo, sheathMat);
+    jointStart.position.copy(start);
+    group.add(jointStart);
 
-    const endJoint = new THREE.Mesh(jointSphereGeo, sheathMat);
-    endJoint.position.copy(end);
-    group.add(endJoint);
+    const jointEnd = new THREE.Mesh(jointSphereGeo, sheathMat);
+    jointEnd.position.copy(end);
+    group.add(jointEnd);
 
     scene.add(group);
   }, []);
 
-  // 创建传感器节点 (Phase 9 Pro Max - 最终修复版)
+  // 创建传感器节点 (工业级电缆分支箱)
   const createSensor = useCallback((sensor: Sensor, scene: THREE.Scene) => {
     const group = new THREE.Group();
-    // 关键修复：将组的位置设置为传感器位置，作为缩放的中心点 (Pivot Point)
-    // 这样缩放时就不会"漂移"了
-    group.position.set(sensor.position[0], sensor.position[1], sensor.position[2]);
+    // 将组放置在地面 (y=0)，忽略传感器定义的悬空高度，只取xz坐标
+    group.position.set(sensor.position[0], 0, sensor.position[2]);
 
-    const color = sensor.status === 'normal' ? '#10B981' : (sensor.status === 'warning' ? '#F59E0B' : '#EF4444');
-    
-    // 1. 抱箍式接头 (紧贴电缆)
-    // 使用圆柱体模拟抱箍，位置相对 group 原点 (0,0,0)
-    const clampGeo = new THREE.CylinderGeometry(1.2, 1.2, 1.5, 32);
-    const clampMat = new THREE.MeshPhysicalMaterial({
-      color: '#1e293b', // 蓝灰色工业金属
-      roughness: 0.5,
-      metalness: 0.7,
-      clearcoat: 0.3
+    // 状态颜色映射
+    const statusColors = {
+      normal: '#10b981',   // 工业绿 (Emerald-500)
+      warning: '#f59e0b',  // 警示黄 (Amber-500)
+      fault: '#ef4444'     // 故障红 (Red-500)
+    };
+    const statusColor = statusColors[sensor.status];
+
+    // === 1. 混凝土基座 ===
+    const baseGeo = new THREE.BoxGeometry(3, 0.5, 3);
+    const baseMat = new THREE.MeshStandardMaterial({
+      color: '#57534e', // 石头灰
+      roughness: 0.9,
+      map: null // 如果有混凝土纹理最好，这里用粗糙材质模拟
     });
-    const clamp = new THREE.Mesh(clampGeo, clampMat);
-    clamp.rotation.z = Math.PI / 2; // 横向
-    clamp.position.set(0, 0.5, 0); // 稍微抬高，紧贴地面电缆
-    clamp.castShadow = true;
-    clamp.userData = { sensorId: sensor.id };
-    group.add(clamp);
+    const base = new THREE.Mesh(baseGeo, baseMat);
+    base.position.y = 0.25;
+    base.castShadow = true;
+    base.receiveShadow = true;
+    group.add(base);
 
-    // 2. 智能监测盒 (安装在抱箍上)
-    const boxGeo = new THREE.BoxGeometry(1.0, 0.8, 1.0);
-    const boxMat = new THREE.MeshPhysicalMaterial({ color: '#334155', metalness: 0.5, roughness: 0.2 });
+    // === 2. 工业金属箱体 (主分接箱) ===
+    // 高度需覆盖电缆高度 (1.5 ~ 2.0)，箱体设为高 3.2
+    const boxHeight = 3.2;
+    const boxWidth = 2.4;
+    const boxGeo = new THREE.BoxGeometry(boxWidth, boxHeight, boxWidth);
+    const boxMat = new THREE.MeshStandardMaterial({
+      color: '#334155', // Slate-700 深蓝灰金属
+      roughness: 0.4,
+      metalness: 0.6,
+    });
     const box = new THREE.Mesh(boxGeo, boxMat);
-    box.position.set(0, 1.4, 0); // 在抱箍上方
+    box.position.y = 0.5 + boxHeight / 2; // 基座之上
     box.castShadow = true;
-    box.userData = { sensorId: sensor.id };
+    box.receiveShadow = true;
+    box.userData = { sensorId: sensor.id }; // 点击交互目标
     group.add(box);
 
-    // 3. 状态指示灯 (呼吸灯)
-    const lightGeo = new THREE.SphereGeometry(0.3, 16, 16);
-    const lightMat = new THREE.MeshStandardMaterial({ color: color, emissive: color, emissiveIntensity: 2.0 });
-    const light = new THREE.Mesh(lightGeo, lightMat);
-    light.position.set(0, 1.9, 0); // 顶部
-    light.userData = { sensorId: sensor.id };
-    group.add(light);
+    // === 3. 细节：检修门与把手 ===
+    const doorGeo = new THREE.BoxGeometry(boxWidth * 0.8, boxHeight * 0.8, 0.1);
+    const doorMat = new THREE.MeshStandardMaterial({
+      color: '#475569', // Slate-600
+      metalness: 0.5,
+      roughness: 0.5
+    });
+    const door = new THREE.Mesh(doorGeo, doorMat);
+    door.position.set(0, 0.5 + boxHeight / 2, boxWidth / 2 + 0.05); // Z轴正面突出一点
+    group.add(door);
 
-    // 4. 全息光环 (状态指示)
-    const ringGeo = new THREE.TorusGeometry(1.5, 0.05, 16, 64);
-    const ringMat = new THREE.MeshBasicMaterial({ color: color, transparent: true, opacity: 0.6 });
+    // 门把手
+    const handleGeo = new THREE.BoxGeometry(0.1, 0.4, 0.15);
+    const handleMat = new THREE.MeshStandardMaterial({ color: '#cbd5e1', metalness: 0.8 });
+    const handle = new THREE.Mesh(handleGeo, handleMat);
+    handle.position.set(0.6, 0.5 + boxHeight / 2, boxWidth / 2 + 0.15);
+    group.add(handle);
+
+    // === 4. 状态指示灯 (顶部三色塔灯风格) ===
+    const lightGroup = new THREE.Group();
+    lightGroup.position.set(0, 0.5 + boxHeight, 0);
+
+    // 灯座
+    const mountGeo = new THREE.CylinderGeometry(0.4, 0.5, 0.2, 16);
+    const mount = new THREE.Mesh(mountGeo, new THREE.MeshStandardMaterial({ color: '#1e293b' }));
+    mount.position.y = 0.1;
+    lightGroup.add(mount);
+
+    // 发光罩
+    const bulbGeo = new THREE.CylinderGeometry(0.3, 0.3, 0.6, 16);
+    const bulbMat = new THREE.MeshPhysicalMaterial({
+      color: statusColor,
+      emissive: statusColor,
+      emissiveIntensity: 2.0,
+      transmission: 0.5, // 玻璃质感
+      thickness: 0.5,
+      roughness: 0.1
+    });
+    const bulb = new THREE.Mesh(bulbGeo, bulbMat);
+    bulb.position.y = 0.5;
+    bulb.userData = { sensorId: sensor.id };
+    lightGroup.add(bulb);
+
+    // 顶部盖帽
+    const capGeo = new THREE.CylinderGeometry(0.35, 0.35, 0.1, 16);
+    const cap = new THREE.Mesh(capGeo, new THREE.MeshStandardMaterial({ color: '#1e293b' }));
+    cap.position.y = 0.85;
+    lightGroup.add(cap);
+
+    // 脉冲光环 (保留但缩小，作为状态增强)
+    const ringGeo = new THREE.TorusGeometry(0.4, 0.05, 8, 32);
+    const ringMat = new THREE.MeshBasicMaterial({ color: statusColor, transparent: true, opacity: 0.6 });
     const ring = new THREE.Mesh(ringGeo, ringMat);
     ring.rotation.x = Math.PI / 2;
-    ring.position.set(0, 1.0, 0);
-    ring.userData = { sensorId: sensor.id };
-    group.add(ring);
+    ring.position.y = 0.5;
+    lightGroup.add(ring);
 
-    // 5. 接地系统 (连接到侧面)
-    const groundWirePath = new THREE.CatmullRomCurve3([
-      new THREE.Vector3(0, 0.5, 0),
-      new THREE.Vector3(1.5, 0.2, 1.5),
-      new THREE.Vector3(2.5, 0, 2.5)
-    ]);
-    const groundWireGeo = new THREE.TubeGeometry(groundWirePath, 20, 0.05, 8, false);
-    const groundWireMat = new THREE.MeshStandardMaterial({ color: '#000000' });
-    const groundWire = new THREE.Mesh(groundWireGeo, groundWireMat);
-    group.add(groundWire);
+    group.add(lightGroup);
 
-    const groundBoxGeo = new THREE.BoxGeometry(0.8, 0.5, 0.8);
-    const groundBoxMat = new THREE.MeshStandardMaterial({ color: '#475569' });
-    const groundBox = new THREE.Mesh(groundBoxGeo, groundBoxMat);
-    groundBox.position.set(2.5, 0.25, 2.5);
-    groundBox.userData = { sensorId: sensor.id };
-    group.add(groundBox);
+    // === 5. 电缆接入口 (黑色橡胶套管) ===
+    // 模拟电缆从侧面插入箱体的密封套管
+    const portGeo = new THREE.CylinderGeometry(1.0, 1.0, 0.4, 16);
+    const portMat = new THREE.MeshStandardMaterial({ color: '#111827', roughness: 0.8 });
 
-    // 6. 垂直光柱 (指示位置，防止穿模，稍微细一点)
-    const beamGeo = new THREE.CylinderGeometry(0.02, 0.02, 20, 8);
-    const beamMat = new THREE.MeshBasicMaterial({ color: color, transparent: true, opacity: 0.2 });
-    const beam = new THREE.Mesh(beamGeo, beamMat);
-    beam.position.set(0, 10, 0);
-    beam.userData = { sensorId: sensor.id };
-    group.add(beam);
+    // 四个方向的接口 (前后左右)，高度对应电缆高度(1.5)
+    // 注意：group的y=0，所以相对高度就是 1.5
+    const portHeight = 1.5;
+    const portOffset = boxWidth / 2;
 
-    // 保存 Group 到引用
+    const ports = [
+       { pos: [portOffset, portHeight, 0], rotZ: Math.PI / 2 },  // 右
+       { pos: [-portOffset, portHeight, 0], rotZ: Math.PI / 2 }, // 左
+       { pos: [0, portHeight, portOffset], rotX: Math.PI / 2 },  // 前
+       { pos: [0, portHeight, -portOffset], rotX: Math.PI / 2 }, // 后
+    ];
+
+    ports.forEach(p => {
+        const port = new THREE.Mesh(portGeo, portMat);
+        port.position.set(p.pos[0], p.pos[1], p.pos[2]);
+        if (p.rotZ) port.rotation.z = p.rotZ;
+        if (p.rotX) port.rotation.x = p.rotX;
+        group.add(port);
+    });
+
+    // 保存引用
     sensorMeshesRef.current.set(sensor.id, group as any);
-    
+
     scene.add(group);
     return group;
   }, []);
@@ -635,8 +685,8 @@ const CableNetwork3D: React.FC<CableNetwork3DProps> = ({
     }
     
     const label = new CSS2DObject(div);
-    // 提高标签高度，避免遮挡
-    label.position.set(position[0], position[1] + 15, position[2]); 
+    // 提高标签高度，避免遮挡 (降低高度以适配新设备 15 -> 8)
+    label.position.set(position[0], position[1] + 8, position[2]);
     scene.add(label);
     return label;
   }, [onSensorClick]);
@@ -664,10 +714,10 @@ const CableNetwork3D: React.FC<CableNetwork3DProps> = ({
     camera.lookAt(0, 0, 0);
     cameraRef.current = camera;
 
-    // 渲染器
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    // 渲染器 (性能优化)
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
     renderer.setSize(w, h);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5)); // 限制像素比
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -704,13 +754,13 @@ const CableNetwork3D: React.FC<CableNetwork3DProps> = ({
       }
     });
 
-    // 光照 (明亮白色光照)
+    // 光照 (优化)
     scene.add(new THREE.AmbientLight('#ffffff', 0.9));
     const sun = new THREE.DirectionalLight('#ffffff', 1.0);
     sun.position.set(50, 80, 30);
     sun.castShadow = true;
-    sun.shadow.mapSize.width = 2048;
-    sun.shadow.mapSize.height = 2048;
+    sun.shadow.mapSize.width = 1024;  // 降低阴影质量
+    sun.shadow.mapSize.height = 1024;
     sun.shadow.camera.left = -80;
     sun.shadow.camera.right = 80;
     sun.shadow.camera.top = 80;
@@ -907,26 +957,18 @@ const CableNetwork3D: React.FC<CableNetwork3DProps> = ({
       scene.add(label);
     });
 
-    // 动画
+    // 动画 (优化)
     const animate = () => {
       animIdRef.current = requestAnimationFrame(animate);
       controls.update();
-      
-      // 传感器脉冲动画
+
+      // 传感器脉冲动画 (简化)
       const time = Date.now() * 0.002;
-      sensorMeshesRef.current.forEach((mesh) => {
-        // 脉冲缩放
-        const scale = 1 + Math.sin(time) * 0.08;
-        if (mesh.userData.sensorId === hoveredRef.current) {
-          mesh.scale.setScalar(1.3);
-        } else {
-          mesh.scale.setScalar(scale);
-        }
-        
-        // 发光强度
-        if (mesh.material instanceof THREE.MeshPhysicalMaterial) {
-          mesh.material.emissiveIntensity = 0.4 + Math.sin(time * 2) * 0.15;
-        }
+      const baseScale = 1 + Math.sin(time) * 0.05;
+
+      sensorMeshesRef.current.forEach((group) => {
+        const isHovered = group.userData.sensorId === hoveredRef.current;
+        group.scale.setScalar(isHovered ? 1.2 : baseScale);
       });
 
       renderer.render(scene, camera);
