@@ -152,8 +152,8 @@ const CABLE_ROUTES: CablePath[] = [
       [ROAD_OFFSET, CABLE_HEIGHT + 0.8, 60]
     ]
   },
-  // ========== 橙色分支线 (10kV) - 连接各区域 ==========
-  // 左上商业区支线
+  // ========== 橙色分支线 (10kV) - 沿道路L形布线，避开建筑物 ==========
+  // 左上商业区支线 - 沿蓝环向左，再向上
   {
     id: 'branch-nw',
     color: '#F0AD4E',
@@ -161,11 +161,11 @@ const CABLE_ROUTES: CablePath[] = [
     height: 1.8,
     points: [
       [-20 - ROAD_OFFSET, 1.8, -20 - ROAD_OFFSET], // 从蓝环西北角
-      [-35, 1.8, -35],
-      [-50, 1.8, -40]
+      [-55, 1.8, -20 - ROAD_OFFSET], // 沿蓝环上边向左
+      [-55, 1.8, -45] // 向上延伸到商业区
     ]
   },
-  // 右上科技区支线
+  // 右上科技区支线 - 沿蓝环向右，再向上
   {
     id: 'branch-ne',
     color: '#F0AD4E',
@@ -173,11 +173,11 @@ const CABLE_ROUTES: CablePath[] = [
     height: 1.8,
     points: [
       [20 + ROAD_OFFSET, 1.8, -20 - ROAD_OFFSET], // 从蓝环东北角
-      [40, 1.8, -35],
-      [50, 1.8, -45]
+      [55, 1.8, -20 - ROAD_OFFSET], // 沿蓝环上边向右
+      [55, 1.8, -45] // 向上延伸到科技区
     ]
   },
-  // 左下工业区支线
+  // 左下工业区支线 - 沿蓝环向左，再向下
   {
     id: 'branch-sw',
     color: '#F0AD4E',
@@ -185,11 +185,11 @@ const CABLE_ROUTES: CablePath[] = [
     height: 1.8,
     points: [
       [-20 - ROAD_OFFSET, 1.8, 20 + ROAD_OFFSET], // 从蓝环西南角
-      [-40, 1.8, 35],
-      [-50, 1.8, 45]
+      [-55, 1.8, 20 + ROAD_OFFSET], // 沿蓝环下边向左
+      [-55, 1.8, 45] // 向下延伸到工业区
     ]
   },
-  // 右下居民区支线
+  // 右下居民区支线 - 沿蓝环向右，再向下
   {
     id: 'branch-se',
     color: '#F0AD4E',
@@ -197,57 +197,61 @@ const CABLE_ROUTES: CablePath[] = [
     height: 1.8,
     points: [
       [20 + ROAD_OFFSET, 1.8, 20 + ROAD_OFFSET], // 从蓝环东南角
-      [35, 1.8, 35],
-      [45, 1.8, 50]
+      [55, 1.8, 20 + ROAD_OFFSET], // 沿蓝环下边向右
+      [55, 1.8, 45] // 向下延伸到居民区
     ]
   },
-  // ========== 地面管线 (低压/通信) ==========
-  // 左侧地面管沟 - 沿道路
+  // ========== 地面管线 (低压/通信) - L形回旋镖布局 ==========
+  // 左上回旋镖
   {
-    id: 'ground-left',
-    color: '#78716C',
-    thickness: 0.6,
-    height: 0.15,
-    isGround: true,
-    points: [
-      [-5, 0.15, -55],
-      [-5, 0.15, 55]
-    ]
-  },
-  // 右侧地面管沟
-  {
-    id: 'ground-right',
-    color: '#78716C',
-    thickness: 0.6,
-    height: 0.15,
-    isGround: true,
-    points: [
-      [8, 0.15, -55],
-      [8, 0.15, 55]
-    ]
-  },
-  // 上侧地面管沟
-  {
-    id: 'ground-top',
+    id: 'ground-nw',
     color: '#78716C',
     thickness: 0.6,
     height: 0.15,
     isGround: true,
     points: [
       [-55, 0.15, -5],
-      [55, 0.15, -5]
+      [-15, 0.15, -5],
+      [-15, 0.15, -55]
     ]
   },
-  // 下侧地面管沟
+  // 右上回旋镖
   {
-    id: 'ground-bottom',
+    id: 'ground-ne',
+    color: '#78716C',
+    thickness: 0.6,
+    height: 0.15,
+    isGround: true,
+    points: [
+      [55, 0.15, -5],
+      [15, 0.15, -5],
+      [15, 0.15, -55]
+    ]
+  },
+  // 左下回旋镖
+  {
+    id: 'ground-sw',
     color: '#78716C',
     thickness: 0.6,
     height: 0.15,
     isGround: true,
     points: [
       [-55, 0.15, 8],
-      [55, 0.15, 8]
+      [-15, 0.15, 8],
+      [-15, 0.15, 55]
+    ]
+  },
+  // 右下回旋镖
+  {
+    id: 'ground-se',
+    color: '#78716C',
+    thickness: 0.6,
+    height: 0.15,
+    isGround: true,
+    points: [
+      [55, 0.15, 8],
+      [15, 0.15, 8],
+      [15, 0.15, 55]
     ]
   }
 ];
@@ -268,6 +272,16 @@ const SENSORS: Sensor[] = [
   { id: 'S4', position: [20 + ROAD_OFFSET, CABLE_HEIGHT, 20 + ROAD_OFFSET], name: '东南枢纽', status: 'normal' },
   // 绿色十字中心
   { id: 'S5', position: [ROAD_OFFSET, CABLE_HEIGHT + 0.5, ROAD_OFFSET], name: '中央配电站', status: 'fault' },
+  // 蓝环与绿色十字交叉点
+  { id: 'S6', position: [ROAD_OFFSET, CABLE_HEIGHT, -20 - ROAD_OFFSET], name: '北侧交汇点', status: 'normal' },
+  { id: 'S7', position: [ROAD_OFFSET, CABLE_HEIGHT, 20 + ROAD_OFFSET], name: '南侧交汇点', status: 'normal' },
+  { id: 'S8', position: [-60, CABLE_HEIGHT + 0.8, ROAD_OFFSET], name: '西侧端点', status: 'normal' },
+  { id: 'S9', position: [60, CABLE_HEIGHT + 0.8, ROAD_OFFSET], name: '东侧端点', status: 'warning' },
+  // 地面管线L形拐点
+  { id: 'S10', position: [-15, 0.15, -5], name: '西北管沟', status: 'normal' },
+  { id: 'S11', position: [15, 0.15, -5], name: '东北管沟', status: 'normal' },
+  { id: 'S12', position: [-15, 0.15, 8], name: '西南管沟', status: 'normal' },
+  { id: 'S13', position: [15, 0.15, 8], name: '东南管沟', status: 'normal' },
 ];
 
 // ============================================================
