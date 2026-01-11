@@ -93,11 +93,11 @@ for (let x = -70; x <= 70; x += 30) {
   if (Math.abs(x) < 15) continue;
   TREES.push([x, 0, -TREE_OFFSET]); // 只放上侧
 }
-// 区域点缀 - 调整位置避开电缆
-TREES.push([-30, 0, -35]);
-TREES.push([30, 0, -35]);
-TREES.push([-30, 0, 35]);
-TREES.push([30, 0, 35]);      
+// 区域点缀 - 调整位置避开电缆和分支线
+TREES.push([-45, 0, -50]); // 左上角，远离branch-nw
+TREES.push([55, 0, -50]);  // 右上角，远离branch-ne
+TREES.push([-45, 0, 55]);  // 左下角，远离branch-sw
+TREES.push([55, 0, 55]);   // 右下角，远离branch-se      
 
 
 
@@ -109,6 +109,7 @@ interface CablePath {
   height: number;
   points: [number, number, number][]; // 连续点序列
   closed?: boolean; // 是否闭合回路
+  isGround?: boolean; // 是否为地面管线（无电线杆）
 }
 
 // 电缆布局：沿道路边缘，悬空架设
@@ -120,7 +121,7 @@ const CABLE_ROUTES: CablePath[] = [
   {
     id: 'blue-ring',
     color: '#4A90D9',
-    thickness: 0.4, // 单根变细，整体组合
+    thickness: 0.4,
     height: CABLE_HEIGHT,
     closed: true,
     points: [
@@ -135,7 +136,7 @@ const CABLE_ROUTES: CablePath[] = [
     id: 'green-h',
     color: '#5CB85C',
     thickness: 0.3,
-    height: CABLE_HEIGHT + 0.8, // 错层
+    height: CABLE_HEIGHT + 0.8,
     points: [
       [-60, CABLE_HEIGHT + 0.8, ROAD_OFFSET],
       [60, CABLE_HEIGHT + 0.8, ROAD_OFFSET]
@@ -149,6 +150,104 @@ const CABLE_ROUTES: CablePath[] = [
     points: [
       [ROAD_OFFSET, CABLE_HEIGHT + 0.8, -60],
       [ROAD_OFFSET, CABLE_HEIGHT + 0.8, 60]
+    ]
+  },
+  // ========== 橙色分支线 (10kV) - 连接各区域 ==========
+  // 左上商业区支线
+  {
+    id: 'branch-nw',
+    color: '#F0AD4E',
+    thickness: 0.25,
+    height: 1.8,
+    points: [
+      [-20 - ROAD_OFFSET, 1.8, -20 - ROAD_OFFSET], // 从蓝环西北角
+      [-35, 1.8, -35],
+      [-50, 1.8, -40]
+    ]
+  },
+  // 右上科技区支线
+  {
+    id: 'branch-ne',
+    color: '#F0AD4E',
+    thickness: 0.25,
+    height: 1.8,
+    points: [
+      [20 + ROAD_OFFSET, 1.8, -20 - ROAD_OFFSET], // 从蓝环东北角
+      [40, 1.8, -35],
+      [50, 1.8, -45]
+    ]
+  },
+  // 左下工业区支线
+  {
+    id: 'branch-sw',
+    color: '#F0AD4E',
+    thickness: 0.25,
+    height: 1.8,
+    points: [
+      [-20 - ROAD_OFFSET, 1.8, 20 + ROAD_OFFSET], // 从蓝环西南角
+      [-40, 1.8, 35],
+      [-50, 1.8, 45]
+    ]
+  },
+  // 右下居民区支线
+  {
+    id: 'branch-se',
+    color: '#F0AD4E',
+    thickness: 0.25,
+    height: 1.8,
+    points: [
+      [20 + ROAD_OFFSET, 1.8, 20 + ROAD_OFFSET], // 从蓝环东南角
+      [35, 1.8, 35],
+      [45, 1.8, 50]
+    ]
+  },
+  // ========== 地面管线 (低压/通信) ==========
+  // 左侧地面管沟 - 沿道路
+  {
+    id: 'ground-left',
+    color: '#78716C',
+    thickness: 0.6,
+    height: 0.15,
+    isGround: true,
+    points: [
+      [-5, 0.15, -55],
+      [-5, 0.15, 55]
+    ]
+  },
+  // 右侧地面管沟
+  {
+    id: 'ground-right',
+    color: '#78716C',
+    thickness: 0.6,
+    height: 0.15,
+    isGround: true,
+    points: [
+      [8, 0.15, -55],
+      [8, 0.15, 55]
+    ]
+  },
+  // 上侧地面管沟
+  {
+    id: 'ground-top',
+    color: '#78716C',
+    thickness: 0.6,
+    height: 0.15,
+    isGround: true,
+    points: [
+      [-55, 0.15, -5],
+      [55, 0.15, -5]
+    ]
+  },
+  // 下侧地面管沟
+  {
+    id: 'ground-bottom',
+    color: '#78716C',
+    thickness: 0.6,
+    height: 0.15,
+    isGround: true,
+    points: [
+      [-55, 0.15, 8],
+      [55, 0.15, 8]
     ]
   }
 ];
@@ -412,32 +511,55 @@ const CableNetwork3D: React.FC<CableNetwork3DProps> = ({
     cableMesh.castShadow = true;
     group.add(cableMesh);
 
-    // === 3. 添加固定支架/卡具 (Brackets) ===
-    // const curveLength = curve.getLength(); // 上面已计算
-    const spacing = 12; // 支架间距
-    const count = Math.floor(curveLength / spacing);
+    // === 3. 添加电线杆 + 固定支架（仅架空线缆）===
+    // 地面管线不需要电线杆
+    if (!pathData.isGround) {
+      const spacing = 15; // 电线杆间距
+      const count = Math.floor(curveLength / spacing);
 
-    const bracketGeo = new THREE.BoxGeometry(offset * 3.2, r * 0.8, r * 2);
-    const bracketMat = new THREE.MeshStandardMaterial({ color: '#475569', metalness: 0.8, roughness: 0.4 });
+      // 电线杆材质
+      const poleMat = new THREE.MeshStandardMaterial({
+        color: '#64748B',
+        metalness: 0.7,
+        roughness: 0.3
+      });
 
-    for (let i = 0; i <= count; i++) {
-        // 均匀分布，避开首尾
-        const t = (i + 0.5) / (count + 1);
-        const point = curve.getPointAt(t);
-        const tangent = curve.getTangentAt(t);
+      // 支架材质
+      const bracketMat = new THREE.MeshStandardMaterial({
+        color: '#475569',
+        metalness: 0.8,
+        roughness: 0.4
+      });
 
-        const bracket = new THREE.Mesh(bracketGeo, bracketMat);
-        bracket.position.copy(point);
+      for (let i = 0; i <= count; i++) {
+          const t = (i + 0.5) / (count + 1);
+          const point = curve.getPointAt(t);
+          const tangent = curve.getTangentAt(t);
 
-        // 旋转支架以匹配曲线切线
-        // 使用 lookAt 让支架Z轴朝向切线方向，但 BoxGeometry 默认长在X轴
-        // 这里的逻辑：lookAt(target) 会让 Object 的正Z轴指向 target
-        // 我们希望 Box 的“宽面”垂直于切线，即 Box 的 Z 轴与切线一致
-        // 默认 Box 是 AxisAlignedBox。我们需要调整
+          // === 电线杆主杆（从地面到电缆高度）===
+          const poleHeight = point.y;
+          const poleGeo = new THREE.CylinderGeometry(0.12, 0.18, poleHeight, 8);
+          const pole = new THREE.Mesh(poleGeo, poleMat);
+          pole.position.set(point.x, poleHeight / 2, point.z);
+          pole.castShadow = true;
+          group.add(pole);
 
-        bracket.lookAt(point.clone().add(tangent));
+          // === 横臂（支撑电缆的横杆）===
+          const armWidth = offset * 4;
+          const armGeo = new THREE.BoxGeometry(armWidth, 0.12, 0.12);
+          const arm = new THREE.Mesh(armGeo, poleMat);
+          arm.position.copy(point);
+          arm.lookAt(point.clone().add(tangent));
+          arm.castShadow = true;
+          group.add(arm);
 
-        group.add(bracket);
+          // === 顶部支架/卡具 ===
+          const bracketGeo = new THREE.BoxGeometry(offset * 3.2, r * 0.8, r * 2);
+          const bracket = new THREE.Mesh(bracketGeo, bracketMat);
+          bracket.position.copy(point);
+          bracket.lookAt(point.clone().add(tangent));
+          group.add(bracket);
+      }
     }
 
     scene.add(group);
