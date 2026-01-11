@@ -76,104 +76,81 @@ const BUILDINGS: Building[] = [
   { position: [15, 0, 15], size: [6, 16, 6], type: 'lowrise' },      // 右下角
 ];
 
-// 树木位置 - 沿道路两侧 (稀疏化: 步长 15 -> 30)
+// 树木位置 - 沿道路两侧，避开电缆路径
+// 电缆路径：绿色十字在 x=3, z=3，蓝色环在 z=±23
+// 树冠半径约 2.5m，需保持足够距离
 const TREES: [number, number, number][] = [];
-// 沿Z轴道路 (x=0)
-for (let z = -70; z <= 70; z += 30) { // 减少树木
-  if (Math.abs(z) < 15) continue; // 避开十字路口范围加大
-  TREES.push([-6, 0, z]);
-  TREES.push([6, 0, z]);
+const TREE_OFFSET = 10; // 树木距道路中心的偏移，远离电缆
+
+// 沿Z轴道路 (x=0) - 只放在 x=-10 侧，避开 x=3 的绿色垂直线
+for (let z = -70; z <= 70; z += 30) {
+  if (Math.abs(z) < 15) continue; // 避开十字路口
+  if (Math.abs(z) > 18 && Math.abs(z) < 28) continue; // 避开蓝色环 z=±23
+  TREES.push([-TREE_OFFSET, 0, z]); // 只放左侧
 }
-// 沿X轴道路 (z=0)
-for (let x = -70; x <= 70; x += 30) { // 减少树木
+// 沿X轴道路 (z=0) - 只放在 z=-10 侧，避开 z=3 的绿色水平线
+for (let x = -70; x <= 70; x += 30) {
   if (Math.abs(x) < 15) continue;
-  TREES.push([x, 0, -6]);
-  TREES.push([x, 0, 6]);
+  TREES.push([x, 0, -TREE_OFFSET]); // 只放上侧
 }
-// 区域点缀 (减少)
-TREES.push([-25, 0, -25]); 
-TREES.push([25, 0, -25]);   
-TREES.push([-25, 0, 25]);   
-TREES.push([25, 0, 25]);      
+// 区域点缀 - 调整位置避开电缆
+TREES.push([-30, 0, -35]);
+TREES.push([30, 0, -35]);
+TREES.push([-30, 0, 35]);
+TREES.push([30, 0, 35]);      
 
 
 
-// 电缆路径 - 网状连续结构
-interface CableSegment {
-  start: [number, number, number];
-  end: [number, number, number];
-}
-
-interface CableRoute {
+// 电缆路径 - 连续多点结构
+interface CablePath {
   id: string;
   color: string;
   thickness: number;
-  height: number; // 高度层级，用于避免穿模
-  segments: CableSegment[];
+  height: number;
+  points: [number, number, number][]; // 连续点序列
+  closed?: boolean; // 是否闭合回路
 }
 
 // 电缆布局：沿道路边缘，悬空架设
-const ROAD_OFFSET = 3; // 电缆距离道路中心的偏移
-const CABLE_HEIGHT = 1.5; // 电缆悬空高度 (降低高度，更贴近地面)
+const ROAD_OFFSET = 3;
+const CABLE_HEIGHT = 1.5;
 
-const CABLE_ROUTES: CableRoute[] = [
-  // ========== 蓝色外环 (110kV) ==========
+const CABLE_ROUTES: CablePath[] = [
+  // ========== 蓝色外环 (110kV) - 闭合圆角矩形 ==========
   {
-    id: 'blue-ring-top',
+    id: 'blue-ring',
     color: '#4A90D9',
-    thickness: 1.2, // 加粗
+    thickness: 0.4, // 单根变细，整体组合
     height: CABLE_HEIGHT,
-    segments: [
-      { start: [-60, CABLE_HEIGHT, -20 - ROAD_OFFSET], end: [60, CABLE_HEIGHT, -20 - ROAD_OFFSET] },
+    closed: true,
+    points: [
+      [-60, CABLE_HEIGHT, -20 - ROAD_OFFSET], // 左上
+      [60, CABLE_HEIGHT, -20 - ROAD_OFFSET],  // 右上
+      [60, CABLE_HEIGHT, 20 + ROAD_OFFSET],   // 右下
+      [-60, CABLE_HEIGHT, 20 + ROAD_OFFSET],  // 左下
     ]
   },
+  // ========== 绿色十字 (35kV) - 直线 ==========
   {
-    id: 'blue-ring-bottom',
-    color: '#4A90D9',
-    thickness: 1.2, // 加粗
-    height: CABLE_HEIGHT,
-    segments: [
-      { start: [-60, CABLE_HEIGHT, 20 + ROAD_OFFSET], end: [60, CABLE_HEIGHT, 20 + ROAD_OFFSET] },
-    ]
-  },
-  {
-    id: 'blue-ring-left',
-    color: '#4A90D9',
-    thickness: 1.2, // 加粗
-    height: CABLE_HEIGHT,
-    segments: [
-      { start: [-20 - ROAD_OFFSET, CABLE_HEIGHT, -20 - ROAD_OFFSET], end: [-20 - ROAD_OFFSET, CABLE_HEIGHT, 20 + ROAD_OFFSET] },
-    ]
-  },
-  {
-    id: 'blue-ring-right',
-    color: '#4A90D9',
-    thickness: 1.2, // 加粗
-    height: CABLE_HEIGHT,
-    segments: [
-      { start: [20 + ROAD_OFFSET, CABLE_HEIGHT, -20 - ROAD_OFFSET], end: [20 + ROAD_OFFSET, CABLE_HEIGHT, 20 + ROAD_OFFSET] },
-    ]
-  },
-
-  // ========== 绿色十字 (35kV) ==========
-  {
-    id: 'green-cross-h',
+    id: 'green-h',
     color: '#5CB85C',
-    thickness: 1.0, // 加粗
-    height: CABLE_HEIGHT + 0.5,
-    segments: [
-      { start: [-60, CABLE_HEIGHT + 0.5, ROAD_OFFSET], end: [60, CABLE_HEIGHT + 0.5, ROAD_OFFSET] },
+    thickness: 0.3,
+    height: CABLE_HEIGHT + 0.8, // 错层
+    points: [
+      [-60, CABLE_HEIGHT + 0.8, ROAD_OFFSET],
+      [60, CABLE_HEIGHT + 0.8, ROAD_OFFSET]
     ]
   },
   {
-    id: 'green-cross-v',
+    id: 'green-v',
     color: '#5CB85C',
-    thickness: 1.0, // 加粗
-    height: CABLE_HEIGHT + 0.5,
-    segments: [
-      { start: [ROAD_OFFSET, CABLE_HEIGHT + 0.5, -60], end: [ROAD_OFFSET, CABLE_HEIGHT + 0.5, 60] },
+    thickness: 0.3,
+    height: CABLE_HEIGHT + 0.8,
+    points: [
+      [ROAD_OFFSET, CABLE_HEIGHT + 0.8, -60],
+      [ROAD_OFFSET, CABLE_HEIGHT + 0.8, 60]
     ]
-  },
+  }
 ];
 
 // 传感器 - 在电缆交叉/端点位置
@@ -361,17 +338,17 @@ const CableNetwork3D: React.FC<CableNetwork3DProps> = ({
     scene.add(group);
     return group;
   }, []);
-  // 创建电缆 (Phase 9 Pro Max - 真实多层结构+工业质感)
-  const createCable = useCallback((segment: CableSegment, _color: string, thickness: number, scene: THREE.Scene) => {
-    const start = new THREE.Vector3(...segment.start);
-    const end = new THREE.Vector3(...segment.end);
-    const length = start.distanceTo(end);
-    const direction = new THREE.Vector3().subVectors(end, start).normalize();
-    const center = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
+  // 创建电缆系统 (多股 + 支架 + 平滑曲线)
+  const createCableSystem = useCallback((pathData: CablePath, scene: THREE.Scene) => {
+    const points = pathData.points.map(p => new THREE.Vector3(...p));
+    // 创建平滑曲线
+    // tension=0.1 使得转弯更紧凑，不至于太圆滑导致偏离路线
+    const curve = new THREE.CatmullRomCurve3(points, pathData.closed || false, 'catmullrom', 0.1);
 
     const group = new THREE.Group();
 
-    // === 1. 程序化纹理生成 ===
+    // === 1. 材质与纹理恢复 (Phase 9 Pro Max 风格) ===
+
     // 螺旋纹理 (Normal Map)
     const normalCanvas = document.createElement('canvas');
     normalCanvas.width = 256;
@@ -394,31 +371,13 @@ const CableNetwork3D: React.FC<CableNetwork3DProps> = ({
     const normalMap = new THREE.CanvasTexture(normalCanvas);
     normalMap.wrapS = THREE.RepeatWrapping;
     normalMap.wrapT = THREE.RepeatWrapping;
-    normalMap.repeat.set(1, length / 2); // 根据长度重复
+    // 根据曲线长度设置重复
+    const curveLength = curve.getLength();
+    normalMap.repeat.set(1, curveLength / 2);
 
-    // 文字纹理 (Alpha Map)
-    const textCanvas = document.createElement('canvas');
-    textCanvas.width = 1024;
-    textCanvas.height = 128;
-    const tCtx = textCanvas.getContext('2d');
-    if (tCtx) {
-      tCtx.fillStyle = '#000000'; // 透明背景
-      tCtx.fillRect(0, 0, 1024, 128);
-      tCtx.fillStyle = '#FFFFFF'; // 白色文字
-      tCtx.font = 'bold 40px Arial';
-      tCtx.textAlign = 'center';
-      tCtx.textBaseline = 'middle';
-      tCtx.fillText('SUPER-DIM 110kV XLPE POWER CABLE  ⚡  HIGH VOLTAGE  ⚡  DO NOT TOUCH', 512, 64);
-    }
-    const textMap = new THREE.CanvasTexture(textCanvas);
-    textMap.wrapS = THREE.RepeatWrapping;
-    textMap.wrapT = THREE.RepeatWrapping;
-    textMap.repeat.set(length / 10, 1);
-
-    // === 2. 电缆主体 (外护套) ===
-    const sheathGeo = new THREE.CylinderGeometry(thickness, thickness, length, 32);
-    const sheathMat = new THREE.MeshPhysicalMaterial({
-      color: '#1a1a1a', // 深色工业橡胶
+    // 电缆材质 (恢复为深色工业橡胶 + 物理材质)
+    const material = new THREE.MeshPhysicalMaterial({
+      color: '#1a1a1a', // 深色工业橡胶 (忽略 pathData.color，保持工业质感)
       roughness: 0.6,
       metalness: 0.1,
       normalMap: normalMap,
@@ -426,92 +385,60 @@ const CableNetwork3D: React.FC<CableNetwork3DProps> = ({
       clearcoat: 0.3,
       clearcoatRoughness: 0.4,
     });
-    const sheath = new THREE.Mesh(sheathGeo, sheathMat);
 
-    // 旋转对齐
-    const quaternion = new THREE.Quaternion();
-    quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction);
-    sheath.setRotationFromQuaternion(quaternion);
-    sheath.position.copy(center);
-    sheath.castShadow = true;
-    group.add(sheath);
+    // === 2. 生成多股平行电缆 (使用 ExtrudeGeometry) ===
+    const r = pathData.thickness; // 半径
+    const offset = r * 2.2; // 线缆间距
 
-    // === 3. 文字标识层 (贴花) ===
-    // 使用稍微大一点的圆柱体作为文字层，避免z-fighting
-    const labelGeo = new THREE.CylinderGeometry(thickness * 1.01, thickness * 1.01, length, 32);
-    const labelMat = new THREE.MeshBasicMaterial({
-      map: textMap,
-      transparent: true,
-      opacity: 0.6,
-      blending: THREE.AdditiveBlending,
-      side: THREE.DoubleSide,
-      depthWrite: false
-    });
-    const labelMesh = new THREE.Mesh(labelGeo, labelMat);
-    labelMesh.setRotationFromQuaternion(quaternion);
-    labelMesh.position.copy(center);
-    group.add(labelMesh);
+    // 定义三个圆作为截面 (扁平排列)
+    const shape1 = new THREE.Shape();
+    shape1.absarc(0, 0, r, 0, Math.PI * 2, false);
 
-    // === 4. 端部多层结构展示 (仅在两端) ===
-    // 只有当电缆长度足够时才展示
-    if (length > 5) {
-      const layers = [
-        { r: thickness * 0.85, color: '#b87333', metal: 0.8, rough: 0.3, name: '屏蔽层' }, // 铜屏蔽
-        { r: thickness * 0.75, color: '#f0f0f0', metal: 0.0, rough: 0.2, trans: true, op: 0.9, name: '绝缘层' }, // XLPE绝缘
-        { r: thickness * 0.3, color: '#ffdf00', metal: 1.0, rough: 0.4, name: '导体' } // 铜导体
-      ];
+    const shape2 = new THREE.Shape();
+    shape2.absarc(-offset, 0, r, 0, Math.PI * 2, false);
 
-      // 在两端创建层级结构
-      [start, end].forEach((_pos, idx) => {
-        const offset = idx === 0 ? 1 : -1;
+    const shape3 = new THREE.Shape();
+    shape3.absarc(offset, 0, r, 0, Math.PI * 2, false);
 
-        layers.forEach((layer, i) => {
-          // 层级递进露出
-          const layerLen = 1.5 + i * 0.5;
-          const geo = new THREE.CylinderGeometry(layer.r, layer.r, layerLen, 24);
-          const mat = new THREE.MeshPhysicalMaterial({
-            color: layer.color,
-            metalness: layer.metal,
-            roughness: layer.rough,
-            transparent: layer.trans || false,
-            opacity: layer.op || 1.0,
-            side: THREE.DoubleSide
-          });
-          const mesh = new THREE.Mesh(geo, mat);
-          mesh.setRotationFromQuaternion(quaternion);
-          // 调整位置使其从端口伸出
-          const shift = direction.clone().multiplyScalar(offset * (length / 2 - layerLen / 2 + i * 0.2));
-          mesh.position.copy(center).add(shift);
-          group.add(mesh);
-        });
-      });
+    const extrudeSettings = {
+      steps: 150, // 增加细分使曲线更平滑
+      bevelEnabled: false,
+      extrudePath: curve,
+    };
+
+    const geometry = new THREE.ExtrudeGeometry([shape1, shape2, shape3], extrudeSettings);
+
+    const cableMesh = new THREE.Mesh(geometry, material);
+    cableMesh.castShadow = true;
+    group.add(cableMesh);
+
+    // === 3. 添加固定支架/卡具 (Brackets) ===
+    // const curveLength = curve.getLength(); // 上面已计算
+    const spacing = 12; // 支架间距
+    const count = Math.floor(curveLength / spacing);
+
+    const bracketGeo = new THREE.BoxGeometry(offset * 3.2, r * 0.8, r * 2);
+    const bracketMat = new THREE.MeshStandardMaterial({ color: '#475569', metalness: 0.8, roughness: 0.4 });
+
+    for (let i = 0; i <= count; i++) {
+        // 均匀分布，避开首尾
+        const t = (i + 0.5) / (count + 1);
+        const point = curve.getPointAt(t);
+        const tangent = curve.getTangentAt(t);
+
+        const bracket = new THREE.Mesh(bracketGeo, bracketMat);
+        bracket.position.copy(point);
+
+        // 旋转支架以匹配曲线切线
+        // 使用 lookAt 让支架Z轴朝向切线方向，但 BoxGeometry 默认长在X轴
+        // 这里的逻辑：lookAt(target) 会让 Object 的正Z轴指向 target
+        // 我们希望 Box 的“宽面”垂直于切线，即 Box 的 Z 轴与切线一致
+        // 默认 Box 是 AxisAlignedBox。我们需要调整
+
+        bracket.lookAt(point.clone().add(tangent));
+
+        group.add(bracket);
     }
-
-    // === 5. 固定卡具 (工业细节) ===
-    const ringCount = Math.floor(length / 8);
-    const ringGeo = new THREE.BoxGeometry(thickness * 2.5, thickness * 0.5, thickness * 0.8);
-    const ringMat = new THREE.MeshStandardMaterial({ color: '#475569', roughness: 0.5, metalness: 0.8 });
-
-    for (let i = 1; i <= ringCount; i++) {
-      const t = i / (ringCount + 1);
-      const pos = new THREE.Vector3().lerpVectors(start, end, t);
-      const ring = new THREE.Mesh(ringGeo, ringMat);
-      ring.position.copy(pos);
-      ring.lookAt(end);
-      group.add(ring);
-    }
-
-    // === 6. 拐角平滑处理 (球形接头) ===
-    // 在起点和终点添加与护套同材质的球体，解决圆柱体拼接时的缝隙和锐角问题
-    const jointSphereGeo = new THREE.SphereGeometry(thickness, 24, 24);
-    // 复用护套材质
-    const jointStart = new THREE.Mesh(jointSphereGeo, sheathMat);
-    jointStart.position.copy(start);
-    group.add(jointStart);
-
-    const jointEnd = new THREE.Mesh(jointSphereGeo, sheathMat);
-    jointEnd.position.copy(end);
-    group.add(jointEnd);
 
     scene.add(group);
   }, []);
@@ -735,8 +662,8 @@ const CableNetwork3D: React.FC<CableNetwork3DProps> = ({
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.maxPolarAngle = Math.PI / 2.2;
-    controls.minDistance = 30;
-    controls.maxDistance = 150;
+    controls.minDistance = 1;
+    controls.maxDistance = 200;
     
     // 使用初始目标点
     if (initialCameraState) {
@@ -921,9 +848,9 @@ const CableNetwork3D: React.FC<CableNetwork3DProps> = ({
     TREES.forEach(pos => createTree(pos, scene));
     
     CABLE_ROUTES.forEach(route => {
-      route.segments.forEach(seg => createCable(seg, route.color, route.thickness, scene));
+      createCableSystem(route, scene);
     });
-    
+
     SENSORS.forEach(sensor => {
       createSensor(sensor, scene);
       createLabel(sensor.name, sensor.position, scene, sensor.id);
@@ -1047,7 +974,7 @@ const CableNetwork3D: React.FC<CableNetwork3DProps> = ({
         container.removeChild(labelRenderer.domElement);
       }
     };
-  }, [createBuilding, createCable, createSensor, createLabel, onSensorClick]);
+  }, [createBuilding, createCableSystem, createSensor, createLabel, onSensorClick]);
 
   return (
     <div className="relative w-full h-full">
