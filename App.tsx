@@ -83,85 +83,89 @@ const App: React.FC = () => {
     setViewMode('network');
   }, []);
 
-  // 信号流演示模式
-  if (viewMode === 'signalFlow') {
-    return (
-      <SignalFlowDemo
-        autoPlay={true}
-        cycleDuration={20}
-        onExit={() => setViewMode('network')}
-      />
-    );
-  }
-
-  // 传感器监测数据仪表盘
-  if (viewMode === 'dashboard') {
-    return (
-      <SensorDashboard
-        sensorId={selectedSensorId}
-        onBack={handleBackToNetwork}
-      />
-    );
-  }
-
-  // 传感器3D外观详情（原有ThreeScene）
-  if (viewMode === 'sensorDetail') {
-    return (
-      <div className="relative w-full h-screen bg-[#020305] overflow-hidden font-sans">
-        {/* 性能监控器 */}
-        <PerformanceMonitor enabled={process.env.NODE_ENV !== 'production'} />
-
-        <div className="absolute inset-0 pointer-events-none z-0">
-          <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-black/50 to-transparent" />
-          <div className="absolute bottom-0 left-0 w-full h-32 bg-gradient-to-t from-black/50 to-transparent" />
-        </div>
-
-        <div className="absolute inset-0 z-[1]">
-          <ThreeScene 
-            currentMode={currentMode} 
-            isScanning={true} 
-            isAutoDemo={isAutoDemo}
-            onSensorUpdate={handleSensorUpdate}
-            onDemoComplete={handleDemoComplete}
-          />
-        </div>
-
-        <HUD data={sensorData} mode={currentMode} />
-
-        <ModeSelector 
-          currentMode={currentMode} 
-          onModeChange={handleModeChange}
-          onAutoDemo={handleAutoDemo}
-          isAutoDemo={isAutoDemo}
-        />
-
-        {/* 返回按钮 */}
-        <button
-          onClick={handleBackToNetwork}
-          className="absolute top-4 left-4 z-30 px-4 py-2 bg-slate-800/90 border border-slate-700 rounded-lg text-white text-sm font-medium hover:bg-slate-700 transition-colors pointer-events-auto flex items-center gap-2"
-        >
-          ← 返回电缆网络
-        </button>
-
-        <button
-          onClick={() => setViewMode('signalFlow')}
-          className="absolute bottom-12 right-4 z-30 px-3 py-1.5 bg-cyan-600/20 border border-cyan-500/50 rounded-lg text-cyan-400 text-xs font-bold hover:bg-cyan-600/30 transition-colors pointer-events-auto"
-        >
-          🎬 GIF 演示
-        </button>
-      </div>
-    );
-  }
-
-  // 默认：3D电缆网络视图
   return (
     <div className="relative w-full h-screen bg-[#0f172a] overflow-hidden font-sans">
-      <CableNetwork3D 
-        onSensorClick={handleSensorClick}
-        onViewSensorDetail={handleViewSensorDetail}
-        initialCameraState={cameraState}
-        onCameraChange={handleCameraChange}
-      />
+      
+      {/* 1. 3D电缆网络视图 (Keep-Alive) */}
+      <div className={`absolute inset-0 transition-opacity duration-300 ${viewMode === 'network' ? 'opacity-100 z-10' : 'opacity-0 pointer-events-none z-0'}`}>
+        <CableNetwork3D 
+          active={viewMode === 'network'} // 仅在可见时渲染
+          onSensorClick={handleSensorClick}
+          onViewSensorDetail={handleViewSensorDetail}
+          initialCameraState={cameraState}
+          onCameraChange={handleCameraChange}
+        />
+      </div>
+
+      {/* 2. 信号流演示模式 (按需渲染) */}
+      {viewMode === 'signalFlow' && (
+        <div className="absolute inset-0 z-50 bg-black">
+          <SignalFlowDemo
+            autoPlay={true}
+            cycleDuration={20}
+            onExit={() => setViewMode('network')}
+          />
+        </div>
+      )}
+
+      {/* 3. 传感器监测数据仪表盘 (按需渲染) */}
+      {viewMode === 'dashboard' && (
+        <div className="absolute inset-0 z-50 bg-slate-900">
+          <SensorDashboard
+            sensorId={selectedSensorId}
+            onBack={handleBackToNetwork}
+          />
+        </div>
+      )}
+
+      {/* 4. 传感器3D外观详情 (按需渲染，但为了平滑也可以 Keep-Alive，这里先保持按需以节省资源) */}
+      {viewMode === 'sensorDetail' && (
+        <div className="absolute inset-0 z-50 bg-[#020305]">
+          <div className="relative w-full h-full">
+            {/* 性能监控器 */}
+            <PerformanceMonitor enabled={process.env.NODE_ENV !== 'production'} />
+
+            <div className="absolute inset-0 pointer-events-none z-0">
+              <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-black/50 to-transparent" />
+              <div className="absolute bottom-0 left-0 w-full h-32 bg-gradient-to-t from-black/50 to-transparent" />
+            </div>
+
+            <div className="absolute inset-0 z-[1]">
+              <ThreeScene 
+                currentMode={currentMode} 
+                isScanning={true} 
+                isAutoDemo={isAutoDemo}
+                onSensorUpdate={handleSensorUpdate}
+                onDemoComplete={handleDemoComplete}
+              />
+            </div>
+
+            <HUD data={sensorData} mode={currentMode} />
+
+            <ModeSelector 
+              currentMode={currentMode} 
+              onModeChange={handleModeChange}
+              onAutoDemo={handleAutoDemo}
+              isAutoDemo={isAutoDemo}
+            />
+
+            {/* 返回按钮 */}
+            <button
+              onClick={handleBackToNetwork}
+              className="absolute top-4 left-4 z-30 px-4 py-2 bg-slate-800/90 border border-slate-700 rounded-lg text-white text-sm font-medium hover:bg-slate-700 transition-colors pointer-events-auto flex items-center gap-2"
+            >
+              ← 返回电缆网络
+            </button>
+
+            <button
+              onClick={() => setViewMode('signalFlow')}
+              className="absolute bottom-12 right-4 z-30 px-3 py-1.5 bg-cyan-600/20 border border-cyan-500/50 rounded-lg text-cyan-400 text-xs font-bold hover:bg-cyan-600/30 transition-colors pointer-events-auto"
+            >
+              🎬 GIF 演示
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useCallback } from 'react';
+import React, { useEffect, useRef, useCallback, useMemo } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { CSS2DRenderer, CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
@@ -23,6 +23,7 @@ interface CableNetwork3DProps {
 // ============================================================
 
 interface CableNetwork3DProps {
+  active?: boolean; // 控制渲染循环
   onSensorClick: (id: string) => void;
   onViewSensorDetail: () => void;
   initialCameraState?: { position: [number, number, number]; target: [number, number, number] };
@@ -30,6 +31,7 @@ interface CableNetwork3DProps {
 }
 
 const CableNetwork3D: React.FC<CableNetwork3DProps> = ({ 
+  active = true,
   onSensorClick, 
   onViewSensorDetail,
   initialCameraState,
@@ -41,28 +43,71 @@ const CableNetwork3D: React.FC<CableNetwork3DProps> = ({
   const animIdRef = useRef<number>(0);
   const sceneRef = useRef<THREE.Scene | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
+  const activeRef = useRef(active);
+
+  // 同步 active 状态
+  useEffect(() => {
+    activeRef.current = active;
+  }, [active]);
+
+  // === 材质共享池 (减少对象创建) ===
+  const materials = useMemo(() => {
+    return {
+      // 建筑材质
+      highrise: { 
+        body: new THREE.MeshStandardMaterial({ color: '#F8FAFC', roughness: 0.85, metalness: 0.05 }),
+        window: new THREE.MeshStandardMaterial({ color: '#3B82F6', roughness: 0.2, metalness: 0.7, envMapIntensity: 1.0 }),
+        edge: new THREE.LineBasicMaterial({ color: '#94A3B8', linewidth: 2 }),
+        roof: new THREE.MeshStandardMaterial({ color: '#94A3B8' }) // 屋顶设备
+      },
+      lowrise: { 
+        body: new THREE.MeshStandardMaterial({ color: '#F1F5F9', roughness: 0.85, metalness: 0.05 }),
+        window: new THREE.MeshStandardMaterial({ color: '#60A5FA', roughness: 0.4 }), // 也用作屋顶
+        edge: new THREE.LineBasicMaterial({ color: '#9CA3AF', linewidth: 2 })
+      },
+      factory: { 
+        body: new THREE.MeshStandardMaterial({ color: '#E2E8F0', roughness: 0.85, metalness: 0.05 }),
+        window: new THREE.MeshStandardMaterial({ color: '#64748B' }), // 屋顶
+        chimney: new THREE.MeshStandardMaterial({ color: '#475569' }),
+        edge: new THREE.LineBasicMaterial({ color: '#6B7280', linewidth: 2 })
+      },
+      house: { 
+        body: new THREE.MeshStandardMaterial({ color: '#FFFFFF', roughness: 0.85, metalness: 0.05 }),
+        window: new THREE.MeshStandardMaterial({ color: '#93C5FD', roughness: 0.4 }),
+        edge: new THREE.LineBasicMaterial({ color: '#A1A1AA', linewidth: 2 })
+      },
+      // 传感器基础材质
+      sensor: {
+        base: new THREE.MeshStandardMaterial({ color: '#57534e', roughness: 0.9 }),
+        box: new THREE.MeshStandardMaterial({ color: '#334155', roughness: 0.4, metalness: 0.6 }),
+        door: new THREE.MeshStandardMaterial({ color: '#475569', metalness: 0.5, roughness: 0.5 }),
+        handle: new THREE.MeshStandardMaterial({ color: '#cbd5e1', metalness: 0.8 }),
+        mount: new THREE.MeshStandardMaterial({ color: '#1e293b' }),
+        port: new THREE.MeshStandardMaterial({ color: '#111827', roughness: 0.8 })
+      },
+      // 状态灯材质 (需要发光，且经常变色，这里预创建三种状态)
+      lights: {
+        normal: new THREE.MeshPhysicalMaterial({ color: '#10b981', emissive: '#10b981', emissiveIntensity: 2.0, transmission: 0.5, thickness: 0.5, roughness: 0.1 }),
+        warning: new THREE.MeshPhysicalMaterial({ color: '#f59e0b', emissive: '#f59e0b', emissiveIntensity: 2.0, transmission: 0.5, thickness: 0.5, roughness: 0.1 }),
+        fault: new THREE.MeshPhysicalMaterial({ color: '#ef4444', emissive: '#ef4444', emissiveIntensity: 2.0, transmission: 0.5, thickness: 0.5, roughness: 0.1 })
+      },
+      rings: {
+        normal: new THREE.MeshBasicMaterial({ color: '#10b981', transparent: true, opacity: 0.6 }),
+        warning: new THREE.MeshBasicMaterial({ color: '#f59e0b', transparent: true, opacity: 0.6 }),
+        fault: new THREE.MeshBasicMaterial({ color: '#ef4444', transparent: true, opacity: 0.6 })
+      }
+    };
+  }, []);
 
   // 创建建筑物 (Phase 2 升级版)
   const createBuilding = useCallback((b: Building, scene: THREE.Scene) => {
     const group = new THREE.Group();
     
-    // 根据类型设置颜色 (TranMile风格：白色/浅灰主体 + 蓝色细节)
-    const typeColors = {
-      highrise: { body: '#F8FAFC', window: '#3B82F6', edge: '#94A3B8' },
-      lowrise: { body: '#F1F5F9', window: '#60A5FA', edge: '#9CA3AF' },
-      factory: { body: '#E2E8F0', window: '#64748B', edge: '#6B7280' },
-      house: { body: '#FFFFFF', window: '#93C5FD', edge: '#A1A1AA' },
-    };
-    const colors = typeColors[b.type];
+    const matSet = materials[b.type];
     
     // 建筑主体
     const bodyGeo = new THREE.BoxGeometry(b.size[0], b.size[1], b.size[2]);
-    const bodyMat = new THREE.MeshStandardMaterial({ 
-      color: colors.body, 
-      roughness: 0.85,
-      metalness: 0.05
-    });
-    const body = new THREE.Mesh(bodyGeo, bodyMat);
+    const body = new THREE.Mesh(bodyGeo, matSet.body); // 使用共享材质
     body.position.set(b.position[0], b.size[1] / 2, b.position[2]);
     body.castShadow = true;
     body.receiveShadow = true;
@@ -70,19 +115,13 @@ const CableNetwork3D: React.FC<CableNetwork3DProps> = ({
     
     // 深色边框线 (强化)
     const edges = new THREE.EdgesGeometry(bodyGeo);
-    const edgeMat = new THREE.LineBasicMaterial({ color: colors.edge, linewidth: 2 });
-    const edgeLine = new THREE.LineSegments(edges, edgeMat);
+    const edgeLine = new THREE.LineSegments(edges, matSet.edge); // 使用共享材质
     edgeLine.position.copy(body.position);
     group.add(edgeLine);
     
     // 高楼：多层蓝色玻璃窗带
     if (b.type === 'highrise' && b.size[1] > 10) {
-      const windowMat = new THREE.MeshStandardMaterial({ 
-        color: colors.window, 
-        roughness: 0.2, 
-        metalness: 0.7,
-        envMapIntensity: 1.0
-      });
+      const windowMat = matSet.window; // 使用共享材质
       const floors = Math.floor(b.size[1] / 3);
       for (let i = 1; i < floors; i++) {
         const y = -b.size[1] / 2 + i * 3;
@@ -108,8 +147,8 @@ const CableNetwork3D: React.FC<CableNetwork3DProps> = ({
       }
       // 屋顶设备
       const roofBoxGeo = new THREE.BoxGeometry(b.size[0] * 0.4, 1.5, b.size[2] * 0.4);
-      const roofBoxMat = new THREE.MeshStandardMaterial({ color: '#94A3B8' });
-      const roofBox = new THREE.Mesh(roofBoxGeo, roofBoxMat);
+      // @ts-ignore - highrise has roof material
+      const roofBox = new THREE.Mesh(roofBoxGeo, matSet.roof);
       roofBox.position.set(b.position[0], b.size[1] + 0.75, b.position[2]);
       group.add(roofBox);
     }
@@ -117,8 +156,7 @@ const CableNetwork3D: React.FC<CableNetwork3DProps> = ({
     // 矮房/house：蓝色平屋顶
     if (b.type === 'lowrise' || b.type === 'house') {
       const roofGeo = new THREE.BoxGeometry(b.size[0] + 0.3, 0.3, b.size[2] + 0.3);
-      const roofMat = new THREE.MeshStandardMaterial({ color: colors.window, roughness: 0.4 });
-      const roof = new THREE.Mesh(roofGeo, roofMat);
+      const roof = new THREE.Mesh(roofGeo, matSet.window); // 复用window材质作为屋顶
       roof.position.set(b.position[0], b.size[1] + 0.15, b.position[2]);
       group.add(roof);
     }
@@ -127,21 +165,20 @@ const CableNetwork3D: React.FC<CableNetwork3DProps> = ({
     if (b.type === 'factory') {
       // 灰色平屋顶
       const roofGeo = new THREE.BoxGeometry(b.size[0] + 0.2, 0.4, b.size[2] + 0.2);
-      const roofMat = new THREE.MeshStandardMaterial({ color: '#64748B' });
-      const roof = new THREE.Mesh(roofGeo, roofMat);
+      const roof = new THREE.Mesh(roofGeo, matSet.window); // 工厂的window其实是屋顶色
       roof.position.set(b.position[0], b.size[1] + 0.2, b.position[2]);
       group.add(roof);
       // 烟囱
       const chimneyGeo = new THREE.CylinderGeometry(0.4, 0.5, 3, 8);
-      const chimneyMat = new THREE.MeshStandardMaterial({ color: '#475569' });
-      const chimney = new THREE.Mesh(chimneyGeo, chimneyMat);
+      // @ts-ignore - factory has chimney
+      const chimney = new THREE.Mesh(chimneyGeo, matSet.chimney);
       chimney.position.set(b.position[0] + b.size[0] * 0.3, b.size[1] + 1.5, b.position[2] + b.size[2] * 0.3);
       group.add(chimney);
     }
     
     scene.add(group);
     return group;
-  }, []);
+  }, [materials]); // 依赖 materials
 
 
   // 创建树木 - InstancedMesh 优化版
@@ -399,22 +436,11 @@ const CableNetwork3D: React.FC<CableNetwork3DProps> = ({
     // 将组放置在地面 (y=0)，忽略传感器定义的悬空高度，只取xz坐标
     group.position.set(sensor.position[0], 0, sensor.position[2]);
 
-    // 状态颜色映射
-    const statusColors = {
-      normal: '#10b981',   // 工业绿 (Emerald-500)
-      warning: '#f59e0b',  // 警示黄 (Amber-500)
-      fault: '#ef4444'     // 故障红 (Red-500)
-    };
-    const statusColor = statusColors[sensor.status];
+    const m = materials.sensor;
 
     // === 1. 混凝土基座 ===
     const baseGeo = new THREE.BoxGeometry(3, 0.5, 3);
-    const baseMat = new THREE.MeshStandardMaterial({
-      color: '#57534e', // 石头灰
-      roughness: 0.9,
-      map: null // 如果有混凝土纹理最好，这里用粗糙材质模拟
-    });
-    const base = new THREE.Mesh(baseGeo, baseMat);
+    const base = new THREE.Mesh(baseGeo, m.base); // 共享
     base.position.y = 0.25;
     base.castShadow = true;
     base.receiveShadow = true;
@@ -425,12 +451,7 @@ const CableNetwork3D: React.FC<CableNetwork3DProps> = ({
     const boxHeight = 3.2;
     const boxWidth = 2.4;
     const boxGeo = new THREE.BoxGeometry(boxWidth, boxHeight, boxWidth);
-    const boxMat = new THREE.MeshStandardMaterial({
-      color: '#334155', // Slate-700 深蓝灰金属
-      roughness: 0.4,
-      metalness: 0.6,
-    });
-    const box = new THREE.Mesh(boxGeo, boxMat);
+    const box = new THREE.Mesh(boxGeo, m.box); // 共享
     box.position.y = 0.5 + boxHeight / 2; // 基座之上
     box.castShadow = true;
     box.receiveShadow = true;
@@ -439,19 +460,13 @@ const CableNetwork3D: React.FC<CableNetwork3DProps> = ({
 
     // === 3. 细节：检修门与把手 ===
     const doorGeo = new THREE.BoxGeometry(boxWidth * 0.8, boxHeight * 0.8, 0.1);
-    const doorMat = new THREE.MeshStandardMaterial({
-      color: '#475569', // Slate-600
-      metalness: 0.5,
-      roughness: 0.5
-    });
-    const door = new THREE.Mesh(doorGeo, doorMat);
+    const door = new THREE.Mesh(doorGeo, m.door); // 共享
     door.position.set(0, 0.5 + boxHeight / 2, boxWidth / 2 + 0.05); // Z轴正面突出一点
     group.add(door);
 
     // 门把手
     const handleGeo = new THREE.BoxGeometry(0.1, 0.4, 0.15);
-    const handleMat = new THREE.MeshStandardMaterial({ color: '#cbd5e1', metalness: 0.8 });
-    const handle = new THREE.Mesh(handleGeo, handleMat);
+    const handle = new THREE.Mesh(handleGeo, m.handle); // 共享
     handle.position.set(0.6, 0.5 + boxHeight / 2, boxWidth / 2 + 0.15);
     group.add(handle);
 
@@ -461,35 +476,26 @@ const CableNetwork3D: React.FC<CableNetwork3DProps> = ({
 
     // 灯座
     const mountGeo = new THREE.CylinderGeometry(0.4, 0.5, 0.2, 16);
-    const mount = new THREE.Mesh(mountGeo, new THREE.MeshStandardMaterial({ color: '#1e293b' }));
+    const mount = new THREE.Mesh(mountGeo, m.mount); // 共享
     mount.position.y = 0.1;
     lightGroup.add(mount);
 
     // 发光罩
     const bulbGeo = new THREE.CylinderGeometry(0.3, 0.3, 0.6, 16);
-    const bulbMat = new THREE.MeshPhysicalMaterial({
-      color: statusColor,
-      emissive: statusColor,
-      emissiveIntensity: 2.0,
-      transmission: 0.5, // 玻璃质感
-      thickness: 0.5,
-      roughness: 0.1
-    });
-    const bulb = new THREE.Mesh(bulbGeo, bulbMat);
+    const bulb = new THREE.Mesh(bulbGeo, materials.lights[sensor.status]); // 共享
     bulb.position.y = 0.5;
     bulb.userData = { sensorId: sensor.id };
     lightGroup.add(bulb);
 
     // 顶部盖帽
     const capGeo = new THREE.CylinderGeometry(0.35, 0.35, 0.1, 16);
-    const cap = new THREE.Mesh(capGeo, new THREE.MeshStandardMaterial({ color: '#1e293b' }));
+    const cap = new THREE.Mesh(capGeo, m.mount); // 共享
     cap.position.y = 0.85;
     lightGroup.add(cap);
 
     // 脉冲光环 (保留但缩小，作为状态增强)
     const ringGeo = new THREE.TorusGeometry(0.4, 0.05, 8, 32);
-    const ringMat = new THREE.MeshBasicMaterial({ color: statusColor, transparent: true, opacity: 0.6 });
-    const ring = new THREE.Mesh(ringGeo, ringMat);
+    const ring = new THREE.Mesh(ringGeo, materials.rings[sensor.status]); // 共享
     ring.rotation.x = Math.PI / 2;
     ring.position.y = 0.5;
     lightGroup.add(ring);
@@ -499,8 +505,7 @@ const CableNetwork3D: React.FC<CableNetwork3DProps> = ({
     // === 5. 电缆接入口 (黑色橡胶套管) ===
     // 模拟电缆从侧面插入箱体的密封套管
     const portGeo = new THREE.CylinderGeometry(1.0, 1.0, 0.4, 16);
-    const portMat = new THREE.MeshStandardMaterial({ color: '#111827', roughness: 0.8 });
-
+    
     // 四个方向的接口 (前后左右)，高度对应电缆高度(1.5)
     // 注意：group的y=0，所以相对高度就是 1.5
     const portHeight = 1.5;
@@ -514,7 +519,7 @@ const CableNetwork3D: React.FC<CableNetwork3DProps> = ({
     ];
 
     ports.forEach(p => {
-        const port = new THREE.Mesh(portGeo, portMat);
+        const port = new THREE.Mesh(portGeo, m.port); // 共享
         port.position.set(p.pos[0], p.pos[1], p.pos[2]);
         if (p.rotZ) port.rotation.z = p.rotZ;
         if (p.rotX) port.rotation.x = p.rotX;
@@ -526,7 +531,7 @@ const CableNetwork3D: React.FC<CableNetwork3DProps> = ({
 
     scene.add(group);
     return group;
-  }, []);
+  }, [materials]); // 依赖 materials
 
   // 创建文字标签 (增强版 - 纯净交互)
   const createLabel = useCallback((text: string, position: [number, number, number], scene: THREE.Scene, sensorId?: string) => {
@@ -567,6 +572,17 @@ const CableNetwork3D: React.FC<CableNetwork3DProps> = ({
     scene.add(label);
     return label;
   }, [onSensorClick]);
+
+  // 使用 ref 追踪 active 状态，以便在动画循环中访问最新值
+  // const activeRef = useRef(active); // Removed duplicate definition
+  /* 
+  useEffect(() => {
+    activeRef.current = active;
+    if (active && !animIdRef.current) {
+       // ... logic removed as it was buggy
+    }
+  }, [active]);
+  */
 
   // 初始化场景
   useEffect(() => {
@@ -837,6 +853,11 @@ const CableNetwork3D: React.FC<CableNetwork3DProps> = ({
     // 动画 (优化)
     const animate = () => {
       animIdRef.current = requestAnimationFrame(animate);
+      
+      // 如果不激活，仅更新控制器但不渲染，或者完全跳过
+      // 完全跳过渲染可以节省 GPU
+      if (!activeRef.current) return; 
+
       controls.update();
 
       // 传感器脉冲动画 (简化)
@@ -855,6 +876,7 @@ const CableNetwork3D: React.FC<CableNetwork3DProps> = ({
 
     // 交互事件
     const handleClick = (e: MouseEvent) => {
+      if (!activeRef.current) return; // 不激活时不响应点击
       const rect = container.getBoundingClientRect();
       const mouse = new THREE.Vector2(
         ((e.clientX - rect.left) / rect.width) * 2 - 1,
@@ -874,6 +896,7 @@ const CableNetwork3D: React.FC<CableNetwork3DProps> = ({
     };
 
     const handleMove = (e: MouseEvent) => {
+      if (!activeRef.current) return;
       const rect = container.getBoundingClientRect();
       const mouse = new THREE.Vector2(
         ((e.clientX - rect.left) / rect.width) * 2 - 1,
@@ -922,6 +945,15 @@ const CableNetwork3D: React.FC<CableNetwork3DProps> = ({
       scene.traverse((object) => {
         if (object instanceof THREE.Mesh) {
           if (object.geometry) object.geometry.dispose();
+          // 注意：现在使用了共享材质，不能盲目 dispose() 所有的 material
+          // 但由于我们是在组件卸载时清理，且 materials 对象也是在组件内创建的
+          // 所以这里依然可以 dispose，因为 materials 对象本身也会被垃圾回收
+          // 但为了安全起见（防止 useMemo 缓存的副作用），React 的最佳实践是
+          // 既然材质是在组件内定义的，这里可以不用管它，或者显式清理 materials 对象
+          // 不过，Three.js 的 dispose 是清理 GPU 显存，这是必须的。
+          // 只要确保没有其他组件实例在使用这些材质即可。
+          // 考虑到这是一个单页应用，且 CableNetwork3D 卸载意味着 3D 场景销毁，
+          // 所以这里 dispose 是正确的。
           if (object.material) {
             if (Array.isArray(object.material)) {
               object.material.forEach(m => m.dispose());
