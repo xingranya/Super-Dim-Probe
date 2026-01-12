@@ -66,6 +66,7 @@ const PDSpectrumBars: React.FC<{ pdValue: number }> = React.memo(({ pdValue }) =
 PDSpectrumBars.displayName = 'PDSpectrumBars';
 
 interface SensorDashboardProps {
+  active?: boolean;
   sensorId: string;
   onBack: () => void;
 }
@@ -97,7 +98,7 @@ const GlassCard = ({ children, className = '' }: { children: React.ReactNode; cl
   </div>
 );
 
-const SensorDashboard: React.FC<SensorDashboardProps> = ({ sensorId, onBack }) => {
+const SensorDashboard: React.FC<SensorDashboardProps> = ({ active = true, sensorId, onBack }) => {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [animatedValues, setAnimatedValues] = useState({
     voltage: 110.5,
@@ -110,6 +111,9 @@ const SensorDashboard: React.FC<SensorDashboardProps> = ({ sensorId, onBack }) =
   });
 
   useEffect(() => {
+    // 如果不激活，不启动定时器
+    if (!active) return;
+
     const timer = setInterval(() => {
       setCurrentTime(new Date());
       setAnimatedValues(prev => ({
@@ -123,7 +127,7 @@ const SensorDashboard: React.FC<SensorDashboardProps> = ({ sensorId, onBack }) =
       }));
     }, 1000);
     return () => clearInterval(timer);
-  }, []);
+  }, [active]); // 依赖 active
 
 const sensorInfo = SENSOR_INFO[sensorId] || { name: '未知传感器', location: '未知位置', status: 'normal' };
 
@@ -194,6 +198,7 @@ const sensorInfo = SENSOR_INFO[sensorId] || { name: '未知传感器', location:
             {/* 3D View - 使用 absolute inset-0 确保填满容器 */}
             <div className="absolute inset-0 z-10 bg-[radial-gradient(circle_at_50%_30%,_rgba(30,41,59,0.6)_0%,_rgba(2,6,23,0.95)_90%)]">
               <CableCrossSection3D 
+                active={active}
                 temperature={animatedValues.temperature} 
                 load={animatedValues.current / 500 * 100} 
               />

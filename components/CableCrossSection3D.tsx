@@ -10,10 +10,12 @@ import { RectAreaLightUniformsLib } from 'three/examples/jsm/lights/RectAreaLigh
 interface CableCrossSection3DProps {
   temperature: number;
   load: number;
+  active?: boolean;
 }
 
 // 纹理生成器：生成编织纹理的法线贴图
 const generateBraidedNormalMap = () => {
+  console.log("Generating Braided Normal Map..."); // Debug log to confirm new version
   const canvas = document.createElement('canvas');
   canvas.width = 512;
   canvas.height = 512;
@@ -78,7 +80,7 @@ const generateNoiseMap = () => {
   return texture;
 }
 
-const CableCrossSection3D: React.FC<CableCrossSection3DProps> = ({ temperature, load }) => {
+const CableCrossSection3D: React.FC<CableCrossSection3DProps> = ({ temperature, load, active = true }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
@@ -86,9 +88,15 @@ const CableCrossSection3D: React.FC<CableCrossSection3DProps> = ({ temperature, 
   const layersRef = useRef<THREE.Mesh[]>([]);
   const initRef = useRef(false); // 防止 StrictMode 双重初始化
   const initTimeoutRef = useRef<number | null>(null);
+  
+  const activeRef = useRef(active);
+  useEffect(() => {
+    activeRef.current = active;
+  }, [active]);
 
   // Use a ref to store latest props for the animation loop to access
   const propsRef = useRef({ temperature, load });
+// ...
   useEffect(() => {
     propsRef.current = { temperature, load };
   }, [temperature, load]);
@@ -303,6 +311,9 @@ const CableCrossSection3D: React.FC<CableCrossSection3DProps> = ({ temperature, 
       let frameId: number;
       const animate = () => {
         frameId = requestAnimationFrame(animate);
+        
+        if (!activeRef.current) return;
+
         controls.update();
 
         const { temperature, load } = propsRef.current;

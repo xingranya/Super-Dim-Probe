@@ -10,6 +10,7 @@ import * as TextureFactory from '../utils/textureFactory';
 import * as Shaders from '../utils/shaders';
 
 interface ThreeSceneProps {
+  active?: boolean;
   currentMode: FaultMode;
   isScanning: boolean;
   isAutoDemo?: boolean;  // 自动演示模式
@@ -17,8 +18,14 @@ interface ThreeSceneProps {
   onDemoComplete?: () => void;  // 演示完成回调
 }
 
-const ThreeScene: React.FC<ThreeSceneProps> = ({ currentMode, isScanning, isAutoDemo = false, onSensorUpdate, onDemoComplete }) => {
+const ThreeScene: React.FC<ThreeSceneProps> = ({ active = true, currentMode, isScanning, isAutoDemo = false, onSensorUpdate, onDemoComplete }) => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const activeRef = useRef(active);
+
+  useEffect(() => {
+    activeRef.current = active;
+  }, [active]);
+
   const screenTexRef = useRef<THREE.CanvasTexture | null>(null);
   const screenCanvasRef = useRef<HTMLCanvasElement | null>(null);
   // 新增：存储所有屏幕的引用
@@ -748,6 +755,9 @@ const ThreeScene: React.FC<ThreeSceneProps> = ({ currentMode, isScanning, isAuto
 
     const animate = () => {
       animationId = requestAnimationFrame(animate);
+      
+      if (!activeRef.current) return;
+
       const time = clock.getElapsedTime();
       const { currentMode, isAutoDemo, onSensorUpdate } = propsRef.current;
       frameCountRef.current++;
