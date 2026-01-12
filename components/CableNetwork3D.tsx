@@ -328,7 +328,7 @@ const CableNetwork3D: React.FC<CableNetwork3DProps> = ({
     shape3.absarc(offset, 0, r, 0, Math.PI * 2, false);
 
     const extrudeSettings = {
-      steps: 150, // 增加细分使曲线更平滑
+      steps: 80, // 优化：150 -> 80，减少顶点数
       bevelEnabled: false,
       extrudePath: curve,
     };
@@ -917,6 +917,21 @@ const CableNetwork3D: React.FC<CableNetwork3DProps> = ({
 
       // 简单清理
       renderer.dispose();
+
+      // 深度清理场景资源
+      scene.traverse((object) => {
+        if (object instanceof THREE.Mesh) {
+          if (object.geometry) object.geometry.dispose();
+          if (object.material) {
+            if (Array.isArray(object.material)) {
+              object.material.forEach(m => m.dispose());
+            } else {
+              object.material.dispose();
+            }
+          }
+        }
+      });
+
       if (container.contains(renderer.domElement)) {
         container.removeChild(renderer.domElement);
       }
