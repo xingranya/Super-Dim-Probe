@@ -2,6 +2,11 @@ import React, { useEffect, useRef, useCallback } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { CSS2DRenderer, CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
+import { 
+  BUILDINGS, TREES, CABLE_ROUTES, SENSORS, 
+  Building, CablePath, Sensor,
+  ROAD_OFFSET, CABLE_HEIGHT // 确保常量也被导入
+} from '../constants/sceneData';
 
 /**
  * 3D电缆网络场景 - TranMile风格重构版
@@ -12,277 +17,6 @@ interface CableNetwork3DProps {
   onSensorClick: (sensorId: string) => void;
   onViewSensorDetail: () => void;
 }
-
-// ============================================================
-// 手工设计的场景数据 (非随机生成)
-// ============================================================
-
-// 建筑物数据 - 在方格角落，远离道路
-interface Building {
-  position: [number, number, number];
-  size: [number, number, number];
-  type: 'highrise' | 'lowrise' | 'factory' | 'house';
-  label?: string;
-}
-
-const BUILDINGS: Building[] = [
-  // === 左上区块 (商业/办公) - 加密 ===
-  { position: [-35, 0, -35], size: [10, 22, 10], type: 'highrise', label: '金融中心' },
-  { position: [-50, 0, -35], size: [8, 16, 8], type: 'highrise' },
-  { position: [-35, 0, -50], size: [8, 14, 8], type: 'highrise' },
-  { position: [-55, 0, -50], size: [6, 10, 6], type: 'lowrise' },
-  { position: [-25, 0, -45], size: [6, 8, 6], type: 'lowrise' },
-  { position: [-45, 0, -25], size: [9, 28, 9], type: 'highrise' }, // 新增 - 加高
-  { position: [-60, 0, -25], size: [8, 12, 8], type: 'lowrise' },   // 新增 - 加大
-  
-  // === 右上区块 (科技/研发) - 加密 ===
-  { position: [35, 0, -35], size: [12, 26, 12], type: 'highrise' },
-  { position: [50, 0, -35], size: [9, 19, 9], type: 'highrise', label: '科技大厦' },
-  { position: [35, 0, -55], size: [8, 12, 8], type: 'highrise' },
-  { position: [55, 0, -50], size: [7, 9, 7], type: 'lowrise' },
-  { position: [25, 0, -45], size: [6, 7, 6], type: 'lowrise' },
-  { position: [45, 0, -25], size: [10, 32, 10], type: 'highrise' }, // 新增 - 加高
-  { position: [60, 0, -25], size: [8, 10, 8], type: 'lowrise' },   // 新增 - 加大
-  
-  // === 左下区块 (工业/能源) - 加密 ===
-  { position: [-35, 0, 35], size: [12, 6, 10], type: 'factory', label: '变电站A' },
-  { position: [-55, 0, 35], size: [10, 5, 8], type: 'factory' },
-  { position: [-35, 0, 55], size: [8, 8, 8], type: 'factory' },
-  { position: [-55, 0, 55], size: [6, 12, 6], type: 'factory' },
-  { position: [-25, 0, 45], size: [5, 4, 5], type: 'lowrise' },
-  { position: [-45, 0, 25], size: [10, 15, 10], type: 'factory' },   // 新增 - 加大
-  { position: [-60, 0, 25], size: [8, 8, 8], type: 'factory' },   // 新增 - 加大
-  
-  // === 右下区块 (居住/生活) - 加密 ===
-  { position: [35, 0, 35], size: [8, 9, 8], type: 'lowrise', label: '居民区' },
-  { position: [50, 0, 35], size: [7, 8, 7], type: 'lowrise' },
-  { position: [35, 0, 50], size: [6, 6, 6], type: 'house' },
-  { position: [50, 0, 50], size: [6, 5, 6], type: 'house' },
-  { position: [42, 0, 60], size: [5, 4, 5], type: 'house' },
-  { position: [58, 0, 42], size: [5, 4, 5], type: 'house' },
-  { position: [25, 0, 45], size: [8, 18, 8], type: 'highrise' },    // 新增 - 改为高层
-  { position: [45, 0, 25], size: [8, 14, 8], type: 'lowrise' },    // 新增 - 加高
-  
-  // === 外围填充 ===
-  { position: [-65, 0, 0], size: [6, 5, 6], type: 'lowrise' },
-  { position: [65, 0, 0], size: [6, 5, 6], type: 'lowrise' },
-  { position: [0, 0, -65], size: [8, 6, 8], type: 'lowrise' },
-  { position: [0, 0, 65], size: [8, 6, 8], type: 'factory' },
-  
-  // === 中央区域附近 (新增四角建筑) ===
-  { position: [-15, 0, -15], size: [6, 20, 6], type: 'highrise' },   // 左上角
-  { position: [15, 0, -15], size: [6, 22, 6], type: 'highrise' },    // 右上角
-  { position: [-15, 0, 15], size: [6, 18, 6], type: 'highrise' },    // 左下角
-  { position: [15, 0, 15], size: [6, 16, 6], type: 'lowrise' },      // 右下角
-];
-
-// 树木位置 - 沿道路两侧，避开电缆路径
-// 电缆路径：绿色十字在 x=3, z=3，蓝色环在 z=±23
-// 树冠半径约 2.5m，需保持足够距离
-const TREES: [number, number, number][] = [];
-const TREE_OFFSET = 10; // 树木距道路中心的偏移，远离电缆
-
-// 沿Z轴道路 (x=0) - 只放在 x=-10 侧，避开 x=3 的绿色垂直线
-for (let z = -70; z <= 70; z += 30) {
-  if (Math.abs(z) < 15) continue; // 避开十字路口
-  if (Math.abs(z) > 18 && Math.abs(z) < 28) continue; // 避开蓝色环 z=±23
-  TREES.push([-TREE_OFFSET, 0, z]); // 只放左侧
-}
-// 沿X轴道路 (z=0) - 只放在 z=-10 侧，避开 z=3 的绿色水平线
-for (let x = -70; x <= 70; x += 30) {
-  if (Math.abs(x) < 15) continue;
-  TREES.push([x, 0, -TREE_OFFSET]); // 只放上侧
-}
-// 区域点缀 - 调整位置避开电缆和分支线
-TREES.push([-45, 0, -50]); // 左上角，远离branch-nw
-TREES.push([55, 0, -50]);  // 右上角，远离branch-ne
-TREES.push([-45, 0, 55]);  // 左下角，远离branch-sw
-TREES.push([55, 0, 55]);   // 右下角，远离branch-se      
-
-
-
-// 电缆路径 - 连续多点结构
-interface CablePath {
-  id: string;
-  color: string;
-  thickness: number;
-  height: number;
-  points: [number, number, number][]; // 连续点序列
-  closed?: boolean; // 是否闭合回路
-  isGround?: boolean; // 是否为地面管线（无电线杆）
-}
-
-// 电缆布局：沿道路边缘，悬空架设
-const ROAD_OFFSET = 3;
-const CABLE_HEIGHT = 1.5;
-
-const CABLE_ROUTES: CablePath[] = [
-  // ========== 蓝色外环 (110kV) - 闭合圆角矩形 ==========
-  {
-    id: 'blue-ring',
-    color: '#4A90D9',
-    thickness: 0.4,
-    height: CABLE_HEIGHT,
-    closed: true,
-    points: [
-      [-60, CABLE_HEIGHT, -20 - ROAD_OFFSET], // 左上
-      [60, CABLE_HEIGHT, -20 - ROAD_OFFSET],  // 右上
-      [60, CABLE_HEIGHT, 20 + ROAD_OFFSET],   // 右下
-      [-60, CABLE_HEIGHT, 20 + ROAD_OFFSET],  // 左下
-    ]
-  },
-  // ========== 绿色十字 (35kV) - 直线 ==========
-  {
-    id: 'green-h',
-    color: '#5CB85C',
-    thickness: 0.3,
-    height: CABLE_HEIGHT + 0.8,
-    points: [
-      [-60, CABLE_HEIGHT + 0.8, ROAD_OFFSET],
-      [60, CABLE_HEIGHT + 0.8, ROAD_OFFSET]
-    ]
-  },
-  {
-    id: 'green-v',
-    color: '#5CB85C',
-    thickness: 0.3,
-    height: CABLE_HEIGHT + 0.8,
-    points: [
-      [ROAD_OFFSET, CABLE_HEIGHT + 0.8, -60],
-      [ROAD_OFFSET, CABLE_HEIGHT + 0.8, 60]
-    ]
-  },
-  // ========== 橙色分支线 (10kV) - 沿道路L形布线，避开建筑物 ==========
-  // 左上商业区支线 - 沿蓝环向左，再向上
-  {
-    id: 'branch-nw',
-    color: '#F0AD4E',
-    thickness: 0.25,
-    height: 1.8,
-    points: [
-      [-20 - ROAD_OFFSET, 1.8, -20 - ROAD_OFFSET], // 从蓝环西北角
-      [-55, 1.8, -20 - ROAD_OFFSET], // 沿蓝环上边向左
-      [-55, 1.8, -45] // 向上延伸到商业区
-    ]
-  },
-  // 右上科技区支线 - 沿蓝环向右，再向上
-  {
-    id: 'branch-ne',
-    color: '#F0AD4E',
-    thickness: 0.25,
-    height: 1.8,
-    points: [
-      [20 + ROAD_OFFSET, 1.8, -20 - ROAD_OFFSET], // 从蓝环东北角
-      [55, 1.8, -20 - ROAD_OFFSET], // 沿蓝环上边向右
-      [55, 1.8, -45] // 向上延伸到科技区
-    ]
-  },
-  // 左下工业区支线 - 沿蓝环向左，再向下
-  {
-    id: 'branch-sw',
-    color: '#F0AD4E',
-    thickness: 0.25,
-    height: 1.8,
-    points: [
-      [-20 - ROAD_OFFSET, 1.8, 20 + ROAD_OFFSET], // 从蓝环西南角
-      [-55, 1.8, 20 + ROAD_OFFSET], // 沿蓝环下边向左
-      [-55, 1.8, 45] // 向下延伸到工业区
-    ]
-  },
-  // 右下居民区支线 - 沿蓝环向右，再向下
-  {
-    id: 'branch-se',
-    color: '#F0AD4E',
-    thickness: 0.25,
-    height: 1.8,
-    points: [
-      [20 + ROAD_OFFSET, 1.8, 20 + ROAD_OFFSET], // 从蓝环东南角
-      [55, 1.8, 20 + ROAD_OFFSET], // 沿蓝环下边向右
-      [55, 1.8, 45] // 向下延伸到居民区
-    ]
-  },
-  // ========== 地面管线 (低压/通信) - L形回旋镖布局 ==========
-  // 左上回旋镖
-  {
-    id: 'ground-nw',
-    color: '#78716C',
-    thickness: 0.6,
-    height: 0.15,
-    isGround: true,
-    points: [
-      [-55, 0.15, -5],
-      [-15, 0.15, -5],
-      [-15, 0.15, -55]
-    ]
-  },
-  // 右上回旋镖
-  {
-    id: 'ground-ne',
-    color: '#78716C',
-    thickness: 0.6,
-    height: 0.15,
-    isGround: true,
-    points: [
-      [55, 0.15, -5],
-      [15, 0.15, -5],
-      [15, 0.15, -55]
-    ]
-  },
-  // 左下回旋镖
-  {
-    id: 'ground-sw',
-    color: '#78716C',
-    thickness: 0.6,
-    height: 0.15,
-    isGround: true,
-    points: [
-      [-55, 0.15, 8],
-      [-15, 0.15, 8],
-      [-15, 0.15, 55]
-    ]
-  },
-  // 右下回旋镖
-  {
-    id: 'ground-se',
-    color: '#78716C',
-    thickness: 0.6,
-    height: 0.15,
-    isGround: true,
-    points: [
-      [55, 0.15, 8],
-      [15, 0.15, 8],
-      [15, 0.15, 55]
-    ]
-  }
-];
-
-// 传感器 - 在电缆交叉/端点位置
-interface Sensor {
-  id: string;
-  position: [number, number, number];
-  name: string;
-  status: 'normal' | 'warning' | 'fault';
-}
-
-const SENSORS: Sensor[] = [
-  // 蓝色环节点 - 位于电缆高度
-  { id: 'S1', position: [-20 - ROAD_OFFSET, CABLE_HEIGHT, -20 - ROAD_OFFSET], name: '西北枢纽', status: 'normal' },
-  { id: 'S2', position: [20 + ROAD_OFFSET, CABLE_HEIGHT, -20 - ROAD_OFFSET], name: '东北枢纽', status: 'normal' },
-  { id: 'S3', position: [-20 - ROAD_OFFSET, CABLE_HEIGHT, 20 + ROAD_OFFSET], name: '西南枢纽', status: 'warning' },
-  { id: 'S4', position: [20 + ROAD_OFFSET, CABLE_HEIGHT, 20 + ROAD_OFFSET], name: '东南枢纽', status: 'normal' },
-  // 绿色十字中心
-  { id: 'S5', position: [ROAD_OFFSET, CABLE_HEIGHT + 0.5, ROAD_OFFSET], name: '中央配电站', status: 'fault' },
-  // 蓝环与绿色十字交叉点
-  { id: 'S6', position: [ROAD_OFFSET, CABLE_HEIGHT, -20 - ROAD_OFFSET], name: '北侧交汇点', status: 'normal' },
-  { id: 'S7', position: [ROAD_OFFSET, CABLE_HEIGHT, 20 + ROAD_OFFSET], name: '南侧交汇点', status: 'normal' },
-  { id: 'S8', position: [-60, CABLE_HEIGHT + 0.8, ROAD_OFFSET], name: '西侧端点', status: 'normal' },
-  { id: 'S9', position: [60, CABLE_HEIGHT + 0.8, ROAD_OFFSET], name: '东侧端点', status: 'warning' },
-  // 地面管线L形拐点
-  { id: 'S10', position: [-15, 0.15, -5], name: '西北管沟', status: 'normal' },
-  { id: 'S11', position: [15, 0.15, -5], name: '东北管沟', status: 'normal' },
-  { id: 'S12', position: [-15, 0.15, 8], name: '西南管沟', status: 'normal' },
-  { id: 'S13', position: [15, 0.15, 8], name: '东南管沟', status: 'normal' },
-];
 
 // ============================================================
 // React 组件
@@ -409,47 +143,127 @@ const CableNetwork3D: React.FC<CableNetwork3DProps> = ({
     return group;
   }, []);
 
-  // 创建树木 (球形树冠风格)
-  const createTree = useCallback((position: [number, number, number], scene: THREE.Scene) => {
-    const group = new THREE.Group();
-    
-    // 树干
+
+  // 创建树木 - InstancedMesh 优化版
+  const createTreesInstanced = useCallback((scene: THREE.Scene) => {
+    if (TREES.length === 0) return;
+
+    const dummy = new THREE.Object3D();
+
+    // === 1. 树干 InstancedMesh ===
     const trunkGeo = new THREE.CylinderGeometry(0.4, 0.6, 2, 8);
     const trunkMat = new THREE.MeshStandardMaterial({ color: '#8B4513', roughness: 0.9 });
-    const trunk = new THREE.Mesh(trunkGeo, trunkMat);
-    trunk.position.set(0, 1, 0);
-    trunk.castShadow = true;
-    group.add(trunk);
-    
-    // 树冠 (球形)
-    const leavesMat = new THREE.MeshStandardMaterial({ color: '#4ADE80', roughness: 0.8 });
-    
-    // 主球体
-    const sphere1 = new THREE.Mesh(new THREE.SphereGeometry(2.5, 16, 16), leavesMat);
-    sphere1.position.set(0, 3.5, 0);
-    sphere1.castShadow = true;
-    group.add(sphere1);
-    
-    // 随机小球体增加细节
-    const sphere2 = new THREE.Mesh(new THREE.SphereGeometry(1.5, 12, 12), leavesMat);
-    sphere2.position.set(1.2, 2.5, 0.8);
-    sphere2.castShadow = true;
-    group.add(sphere2);
+    const trunkMesh = new THREE.InstancedMesh(trunkGeo, trunkMat, TREES.length);
+    trunkMesh.castShadow = true;
+    trunkMesh.receiveShadow = true;
 
-    const sphere3 = new THREE.Mesh(new THREE.SphereGeometry(1.5, 12, 12), leavesMat);
-    sphere3.position.set(-1.0, 4.0, -0.8);
-    sphere3.castShadow = true;
-    group.add(sphere3);
-    
-    group.position.set(...position);
-    
-    // 随机旋转和缩放
-    group.rotation.y = Math.random() * Math.PI;
-    const scale = 0.8 + Math.random() * 0.4;
-    group.scale.setScalar(scale);
-    
-    scene.add(group);
-    return group;
+    // === 2. 树冠 InstancedMesh (处理每棵树的3个球体) ===
+    // 树冠需要 3 倍的实例数量
+    const leavesGeo = new THREE.SphereGeometry(1, 12, 12); // 基础半径为1，通过缩放控制大小
+    const leavesMat = new THREE.MeshStandardMaterial({ color: '#4ADE80', roughness: 0.8 });
+    const leavesMesh = new THREE.InstancedMesh(leavesGeo, leavesMat, TREES.length * 3);
+    leavesMesh.castShadow = true;
+    leavesMesh.receiveShadow = true;
+
+    let leafIndex = 0;
+
+    TREES.forEach((pos, i) => {
+      // 随机旋转和缩放 (保持与原逻辑一致)
+      // group.rotation.y = Math.random() * Math.PI;
+      // const scale = 0.8 + Math.random() * 0.4;
+      const rotationY = Math.random() * Math.PI;
+      const scale = 0.8 + Math.random() * 0.4;
+
+      // === 设置树干 ===
+      // 原逻辑: trunk.position.set(0, 1, 0); 且 group 整体进行了缩放/旋转/位移
+      dummy.position.set(0, 1 * scale, 0); // 相对高度也随整体scale缩放
+      dummy.rotation.set(0, 0, 0);
+      dummy.scale.set(scale, scale, scale); // 树干自身不额外缩放，只受整体scale影响
+      
+      // 应用整体变换
+      // 1. 先旋转
+      dummy.rotation.y = rotationY;
+      // 2. 再位移到世界坐标 (注意：旋转是绕原点的，所以先应用旋转再位移到世界坐标逻辑上等同于 group 操作)
+      // 实际上 Object3D 的变换顺序是 Scale -> Rotation -> Position
+      // 所以我们直接设置 dummy 的属性即可
+      dummy.position.set(pos[0], 1 * scale, pos[2]); // Y轴修正: 树干中心在1，缩放后世界坐标为 1*scale
+      
+      dummy.updateMatrix();
+      trunkMesh.setMatrixAt(i, dummy.matrix);
+
+
+      // === 设置树冠 (3个球体) ===
+      
+      // 球体 1: sphere1.position.set(0, 3.5, 0); radius=2.5
+      dummy.position.set(0, 3.5, 0); 
+      dummy.rotation.set(0, 0, 0);
+      dummy.scale.set(2.5, 2.5, 2.5); // 基础半径1 -> 2.5
+      
+      // 手动模拟 Group 的层级变换: WorldMatrix = ParentWorldMatrix * LocalMatrix
+      // 这里比较简单，直接用数学计算位置
+      // 旋转后的相对位置:
+      // x' = x * cos(theta) + z * sin(theta)
+      // z' = -x * sin(theta) + z * cos(theta)
+      // 球体1在 (0, 3.5, 0)，旋转后xz不变
+      
+      dummy.scale.multiplyScalar(scale); // 叠加整体缩放
+      dummy.position.multiplyScalar(scale); // 位置也受整体缩放影响
+      
+      // 应用旋转 (球体1在轴上，旋转无影响位置，只影响旋转角度但球体是对称的)
+      // 位移到世界坐标
+      dummy.position.x += pos[0];
+      dummy.position.z += pos[2];
+      
+      dummy.updateMatrix();
+      leavesMesh.setMatrixAt(leafIndex++, dummy.matrix);
+
+      // 球体 2: sphere2.position.set(1.2, 2.5, 0.8); radius=1.5
+      // 需要计算旋转后的偏移
+      const x2 = 1.2;
+      const y2 = 2.5;
+      const z2 = 0.8;
+      
+      // 旋转
+      const cos = Math.cos(rotationY);
+      const sin = Math.sin(rotationY);
+      const rx2 = x2 * cos + z2 * sin;
+      const rz2 = -x2 * sin + z2 * cos;
+      
+      dummy.position.set(rx2, y2, rz2);
+      dummy.position.multiplyScalar(scale); // 整体缩放影响相对位置
+      dummy.position.x += pos[0]; // 世界坐标
+      dummy.position.z += pos[2];
+      
+      dummy.scale.set(1.5, 1.5, 1.5); // 基础半径1 -> 1.5
+      dummy.scale.multiplyScalar(scale); // 叠加整体缩放
+      
+      dummy.rotation.set(0, 0, 0); // 球体旋转不重要
+      dummy.updateMatrix();
+      leavesMesh.setMatrixAt(leafIndex++, dummy.matrix);
+
+      // 球体 3: sphere3.position.set(-1.0, 4.0, -0.8); radius=1.5
+      const x3 = -1.0;
+      const y3 = 4.0;
+      const z3 = -0.8;
+      
+      const rx3 = x3 * cos + z3 * sin;
+      const rz3 = -x3 * sin + z3 * cos;
+      
+      dummy.position.set(rx3, y3, rz3);
+      dummy.position.multiplyScalar(scale);
+      dummy.position.x += pos[0];
+      dummy.position.z += pos[2];
+      
+      dummy.scale.set(1.5, 1.5, 1.5);
+      dummy.scale.multiplyScalar(scale);
+      
+      dummy.updateMatrix();
+      leavesMesh.setMatrixAt(leafIndex++, dummy.matrix);
+    });
+
+    scene.add(trunkMesh);
+    scene.add(leavesMesh);
+
   }, []);
   // 创建电缆系统 (多股 + 支架 + 平滑曲线)
   const createCableSystem = useCallback((pathData: CablePath, scene: THREE.Scene) => {
@@ -981,7 +795,7 @@ const CableNetwork3D: React.FC<CableNetwork3DProps> = ({
 
     // 创建内容
     BUILDINGS.forEach(b => createBuilding(b, scene));
-    TREES.forEach(pos => createTree(pos, scene));
+    createTreesInstanced(scene);
     
     CABLE_ROUTES.forEach(route => {
       createCableSystem(route, scene);
@@ -1110,7 +924,7 @@ const CableNetwork3D: React.FC<CableNetwork3DProps> = ({
         container.removeChild(labelRenderer.domElement);
       }
     };
-  }, [createBuilding, createCableSystem, createSensor, createLabel, onSensorClick]);
+  }, [createBuilding, createCableSystem, createSensor, createLabel, createTreesInstanced, onSensorClick]);
 
   return (
     <div className="relative w-full h-full">
