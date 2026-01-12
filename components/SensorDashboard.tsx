@@ -192,7 +192,7 @@ const sensorInfo = SENSOR_INFO[sensorId] || { name: '未知传感器', location:
             </div>
             
             {/* 3D View - 使用 absolute inset-0 确保填满容器 */}
-            <div className="absolute inset-0 z-10 bg-gradient-to-b from-slate-900/50 to-slate-950/50">
+            <div className="absolute inset-0 z-10 bg-[radial-gradient(circle_at_50%_30%,_rgba(30,41,59,0.6)_0%,_rgba(2,6,23,0.95)_90%)]">
               <CableCrossSection3D 
                 temperature={animatedValues.temperature} 
                 load={animatedValues.current / 500 * 100} 
@@ -272,7 +272,7 @@ const sensorInfo = SENSOR_INFO[sensorId] || { name: '未知传感器', location:
                 </div>
               </div>
               {/* 动态磁场可视化 */}
-              <div className="flex-1 relative flex items-center justify-center overflow-hidden rounded-lg bg-pink-900/10">
+              <div className="flex-1 relative flex items-center justify-center overflow-hidden rounded-lg bg-[radial-gradient(circle_at_center,_rgba(236,72,153,0.15)_0%,_rgba(0,0,0,0)_70%)] border border-pink-500/10">
                  <MagneticFieldViz intensity={animatedValues.magnetic} />
               </div>
             </GlassCard>
@@ -342,29 +342,23 @@ const sensorInfo = SENSOR_INFO[sensorId] || { name: '未知传感器', location:
               <h2 className="font-bold text-lg">AI 智能诊断</h2>
             </div>
 
-            <div className="flex-1 flex flex-col relative">
-              {/* 顶部：环形评分 */}
-              <div className="flex items-center justify-center py-2 flex-none">
+            <div className="flex-1 flex flex-col relative min-h-0">
+              {/* 中心评分 (绝对定位叠加在雷达图上) */}
+              <div className="absolute inset-0 flex flex-col items-center justify-center z-10 pointer-events-none pb-2">
                 <div className="relative">
-                  <svg className="w-28 h-28 transform -rotate-90">
-                    <circle cx="56" cy="56" r="48" fill="none" stroke="#1e293b" strokeWidth="8" />
-                    <circle 
-                      cx="56" cy="56" r="48" fill="none" 
-                      stroke="#10b981" strokeWidth="8"
-                      strokeDasharray={`${94 * 3} ${100 * 3}`}
-                      strokeLinecap="round"
-                      className="drop-shadow-[0_0_10px_rgba(16,185,129,0.5)]"
-                    />
-                  </svg>
-                  <div className="absolute inset-0 flex flex-col items-center justify-center">
-                    <div className="text-3xl font-bold text-white">94<span className="text-sm">%</span></div>
-                    <div className="text-[10px] text-emerald-400 font-medium uppercase tracking-wider">健康评分</div>
+                  <div className="text-5xl font-bold text-white drop-shadow-[0_0_15px_rgba(16,185,129,0.5)] tracking-tight">
+                    94<span className="text-xl text-emerald-400 ml-0.5">%</span>
                   </div>
+                  <div className="text-[10px] text-emerald-400/80 font-medium uppercase tracking-[0.2em] text-center mt-1">
+                    健康评分
+                  </div>
+                  {/* 装饰性光环 */}
+                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 bg-emerald-500/10 rounded-full blur-2xl -z-10" />
                 </div>
               </div>
 
-              {/* 中部：ECharts 雷达图 */}
-              <div className="flex-1 min-h-0 -mt-4">
+              {/* 雷达图 - 调整位置和半径以适配中心文字 */}
+              <div className="flex-1 min-h-0 w-full h-full">
                 <ReactECharts 
                   option={{
                     backgroundColor: 'transparent',
@@ -377,26 +371,40 @@ const sensorInfo = SENSOR_INFO[sensorId] || { name: '未知传感器', location:
                         { name: '环境', max: 100 },
                         { name: '寿命', max: 100 }
                       ],
-                      center: ['50%', '55%'],
-                      radius: '65%',
-                      splitNumber: 3,
-                      axisName: { color: '#94a3b8', fontSize: 10 },
-                      splitLine: { lineStyle: { color: 'rgba(255, 255, 255, 0.05)' } },
-                      splitArea: { show: false },
-                      axisLine: { lineStyle: { color: 'rgba(255, 255, 255, 0.05)' } },
-                      axisLabel: { show: false }
+                      center: ['50%', '50%'],
+                      radius: ['45%', '70%'], // 内半径空出给文字，外半径扩大
+                      splitNumber: 4,
+                      axisName: { 
+                        color: '#94a3b8', 
+                        fontSize: 11,
+                        fontWeight: 500
+                      },
+                      splitLine: { 
+                        lineStyle: { color: 'rgba(255, 255, 255, 0.08)' } 
+                      },
+                      splitArea: { 
+                        show: true,
+                        areaStyle: {
+                          color: ['rgba(255,255,255,0.02)', 'rgba(255,255,255,0.05)']
+                        }
+                      },
+                      axisLine: { 
+                        lineStyle: { color: 'rgba(255, 255, 255, 0.1)' } 
+                      }
                     },
                     series: [{
                       type: 'radar',
                       data: [{
                         value: [96, 92, 98, 85, 90, 88],
                         name: '健康状态',
-                        symbol: 'none',
+                        symbol: 'circle',
+                        symbolSize: 4,
+                        itemStyle: { color: '#10b981' },
                         lineStyle: { width: 2, color: '#10b981' },
                         areaStyle: {
-                          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                            { offset: 0, color: 'rgba(16, 185, 129, 0.4)' },
-                            { offset: 1, color: 'rgba(16, 185, 129, 0.05)' }
+                          color: new echarts.graphic.RadialGradient(0.5, 0.5, 1, [
+                            { offset: 0, color: 'rgba(16, 185, 129, 0.1)' },
+                            { offset: 1, color: 'rgba(16, 185, 129, 0.5)' }
                           ])
                         }
                       }]
@@ -408,7 +416,7 @@ const sensorInfo = SENSOR_INFO[sensorId] || { name: '未知传感器', location:
               </div>
 
               {/* 底部：模型信息 */}
-              <div className="flex-none pt-2 border-t border-white/5">
+              <div className="flex-none pt-3 pb-1 border-t border-white/5">
                 <div className="flex justify-between text-[10px] text-slate-400">
                   <span>模型: Transformer-v4</span>
                   <span>置信度: <span className="text-emerald-400">98.2%</span></span>
@@ -417,23 +425,42 @@ const sensorInfo = SENSOR_INFO[sensorId] || { name: '未知传感器', location:
             </div>
           </GlassCard>
 
-          {/* 生成报告 - 紧凑单行 */}
-          <GlassCard className="!py-2.5 !px-4 group cursor-pointer hover:bg-white/10 transition-all">
-            <div className="flex items-center gap-3">
+          {/* 生成报告 - 均衡布局 (避免空旷) - 手动实现 Glass 效果以修复布局冲突 */}
+          <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl shadow-2xl group cursor-pointer hover:bg-white/10 transition-all">
+            {/* 光泽背景 */}
+            <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-white/5 to-transparent pointer-events-none" />
+            
+            {/* 内容容器 - 显式控制布局 */}
+            <div className="relative z-10 p-3.5 flex items-center gap-3">
+              {/* 1. 图标 */}
               <div className="p-2 rounded-lg bg-indigo-500/20 flex-shrink-0">
-                <TrendingUp size={16} className="text-indigo-400" />
+                <TrendingUp size={18} className="text-indigo-400" />
               </div>
-              <span className="font-semibold text-white text-sm whitespace-nowrap">生成报告</span>
-              <span className="text-[10px] text-slate-500 whitespace-nowrap">10分钟前</span>
-              <div className="flex-1" />
-              <button className="py-1 px-2.5 rounded bg-indigo-500/20 text-indigo-300 text-xs font-medium hover:bg-indigo-500/30">
-                PDF
-              </button>
-              <button className="py-1 px-2.5 rounded bg-slate-700/50 text-slate-400 text-xs font-medium hover:bg-slate-600/50">
-                Excel
-              </button>
+              
+              {/* 2. 标题区 (自适应填充) */}
+              <div className="flex-1 flex flex-col min-w-0">
+                <div className="flex items-baseline justify-between">
+                  <span className="font-semibold text-white text-sm whitespace-nowrap">生成报告</span>
+                  {/* 时间戳靠右对齐 */}
+                  <span className="text-[10px] text-slate-500 font-mono ml-2">10:24 AM</span>
+                </div>
+                {/* 进度条装饰 */}
+                <div className="w-full h-1 bg-white/5 rounded-full mt-1.5 overflow-hidden">
+                  <div className="w-2/3 h-full bg-indigo-500/50 rounded-full" />
+                </div>
+              </div>
+
+              {/* 3. 按钮组 (紧凑) */}
+              <div className="flex items-center gap-2 pl-2 border-l border-white/5">
+                <button className="h-8 px-3 rounded bg-indigo-500/20 text-indigo-300 text-xs font-bold hover:bg-indigo-500/30 transition-colors border border-indigo-500/20">
+                  PDF
+                </button>
+                <button className="h-8 px-3 rounded bg-slate-700/50 text-slate-300 text-xs font-bold hover:bg-slate-600/50 transition-colors border border-white/5">
+                  XLS
+                </button>
+              </div>
             </div>
-          </GlassCard>
+          </div>
         </div>
 
       </main>
