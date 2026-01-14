@@ -12,7 +12,6 @@ dist
 dist-ssr
 *.local
 .agent
-dashboard
 
 # Editor directories and files
 .vscode/*
