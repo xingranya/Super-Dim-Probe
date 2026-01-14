@@ -1015,16 +1015,16 @@ const CableNetwork3D: React.FC<CableNetwork3DProps> = ({
         </div>
       </div>
 
-      {/* 操作按钮 */}
+      {/* 操作按钮 - 移至右下角 */}
       <button
         onClick={onViewSensorDetail}
-        className="absolute top-4 right-4 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg shadow-lg transition-all flex items-center gap-2 font-medium"
+        className="absolute bottom-4 right-4 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg shadow-lg transition-all flex items-center gap-2 font-medium z-20"
       >
         🔍 传感器模型视图
       </button>
 
-      {/* 提示 */}
-      <div className="absolute bottom-4 right-4 text-xs text-slate-500 bg-white/80 px-3 py-1.5 rounded-lg shadow">
+      {/* 提示 - 移至按钮上方 */}
+      <div className="absolute bottom-16 right-4 text-xs text-slate-500 bg-white/80 px-3 py-1.5 rounded-lg shadow pointer-events-none">
         点击传感器节点查看监测数据
       </div>
     </div>

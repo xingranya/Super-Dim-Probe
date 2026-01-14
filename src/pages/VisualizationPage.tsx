@@ -1,12 +1,13 @@
 import React, { useState, useCallback, useMemo } from 'react';
-import ThreeScene from './components/ThreeScene';
-import HUD from './components/HUD';
-import { ModeSelector } from './components/Controls';
-import SignalFlowDemo from './components/SignalFlowDemo';
-import CableNetwork3D from './components/CableNetwork3D';
-import SensorDashboard from './components/SensorDashboard';
-import PerformanceMonitor from './components/PerformanceMonitor';
-import { FaultMode, SensorData } from './types';
+import ThreeScene from '../components/ThreeScene';
+import HUD from '../components/HUD';
+import { ModeSelector } from '../components/Controls';
+import SignalFlowDemo from '../components/SignalFlowDemo';
+import CableNetwork3D from '../components/CableNetwork3D';
+import SensorDashboard from '../components/SensorDashboard';
+import PerformanceMonitor from '../components/PerformanceMonitor';
+import SystemPortal from '../components/SystemPortal';
+import { FaultMode, SensorData } from '../types';
 
 /**
  * 应用视图模式
@@ -17,10 +18,23 @@ import { FaultMode, SensorData } from './types';
  */
 type ViewMode = 'network' | 'dashboard' | 'sensorDetail' | 'signalFlow';
 
-const App: React.FC = () => {
+const VisualizationPage: React.FC = () => {
   // 视图模式状态
   const [viewMode, setViewMode] = useState<ViewMode>('network');
   const [selectedSensorId, setSelectedSensorId] = useState<string>('J1');
+
+  // 进入页面时设置 body 样式
+  React.useEffect(() => {
+    // 3D 页面需要隐藏滚动条并禁用默认触摸行为
+    document.body.style.overflow = 'hidden';
+    document.body.style.touchAction = 'none';
+    
+    return () => {
+      // 离开页面时恢复默认样式
+      document.body.style.overflow = '';
+      document.body.style.touchAction = '';
+    };
+  }, []);
 
   // 原有状态（传感器3D详情模式使用）
   const [currentMode, setCurrentMode] = useState<FaultMode>(FaultMode.XLPE_TREEING);
@@ -95,6 +109,8 @@ const App: React.FC = () => {
           initialCameraState={cameraState}
           onCameraChange={handleCameraChange}
         />
+        {/* SmartTech 跳转入口 */}
+        <SystemPortal />
       </div>
 
       {/* 2. 信号流演示模式 (按需渲染，因为是模态框且很少用) */}
@@ -168,4 +184,4 @@ const App: React.FC = () => {
   );
 };
 
-export default App;
+export default VisualizationPage;
