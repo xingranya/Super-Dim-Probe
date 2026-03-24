@@ -7,7 +7,9 @@ import CableNetwork3D from '../components/CableNetwork3D';
 import SensorDashboard from '../components/SensorDashboard';
 import PerformanceMonitor from '../components/PerformanceMonitor';
 import SystemPortal from '../components/SystemPortal';
+import CableMapViewer from '../components/webmap/MapView';
 import { FaultMode, SensorData } from '../types';
+import { mockCables, mockSensors } from '../data/mockGeoData';
 
 /**
  * 应用视图模式
@@ -15,13 +17,16 @@ import { FaultMode, SensorData } from '../types';
  * - dashboard: 传感器监测数据仪表盘
  * - sensorDetail: 传感器3D外观详情（原有ThreeScene）
  * - signalFlow: 信号流演示
+ * - webmap: WebGIS卫星地图视图
  */
-type ViewMode = 'network' | 'dashboard' | 'sensorDetail' | 'signalFlow';
+type ViewMode = 'network' | 'dashboard' | 'sensorDetail' | 'signalFlow' | 'webmap';
 
 const VisualizationPage: React.FC = () => {
   // 视图模式状态
   const [viewMode, setViewMode] = useState<ViewMode>('network');
   const [selectedSensorId, setSelectedSensorId] = useState<string>('J1');
+  // 记录上一个视图，用于返回导航
+  const [previousView, setPreviousView] = useState<ViewMode>('network');
 
   // 进入页面时设置 body 样式
   React.useEffect(() => {
@@ -81,28 +86,30 @@ const VisualizationPage: React.FC = () => {
     setIsAutoDemo(false);
   }, []);
 
-  // 传感器点击 - 跳转到仪表盘
+  // 传感器点击 - 跳转到仪表盘（记住上一个视图）
   const handleSensorClick = useCallback((sensorId: string) => {
+    setPreviousView(viewMode);
     setSelectedSensorId(sensorId);
     setViewMode('dashboard');
-  }, []);
+  }, [viewMode]);
 
   // 查看传感器3D外观详情
   const handleViewSensorDetail = useCallback(() => {
+    setPreviousView(viewMode);
     setViewMode('sensorDetail');
   }, []);
 
-  // 返回电缆网络视图
-  const handleBackToNetwork = useCallback(() => {
-    setViewMode('network');
-  }, []);
+  // 返回上一个视图
+  const handleBack = useCallback(() => {
+    setViewMode(previousView);
+  }, [previousView]);
 
   return (
     <div className="relative w-full h-screen bg-[#0f172a] overflow-hidden font-sans">
       
       {/* 1. 3D电缆网络视图 (Keep-Alive) */}
       <div className={`absolute inset-0 transition-opacity duration-300 ${viewMode === 'network' ? 'opacity-100 z-10' : 'opacity-0 pointer-events-none z-0'}`}>
-        <CableNetwork3D 
+        <CableNetwork3D
           active={viewMode === 'network'} // 仅在可见时渲染
           onSensorClick={handleSensorClick}
           onViewSensorDetail={handleViewSensorDetail}
@@ -111,6 +118,26 @@ const VisualizationPage: React.FC = () => {
         />
         {/* SmartTech 跳转入口 */}
         <SystemPortal />
+
+        {/* WebGIS 切换按钮 - 右上角，智能业务平台左边 */}
+        <div className="absolute top-4 right-72 z-40 pointer-events-auto flex gap-2">
+          <button
+            onClick={() => { setPreviousView(viewMode); setViewMode('webmap'); }}
+            className="group relative flex items-center gap-2 px-3 py-2 bg-slate-900/80 border border-emerald-500/30 rounded-lg backdrop-blur-md hover:bg-slate-800/90 hover:border-emerald-400 transition-all duration-300 shadow-[0_0_15px_rgba(16,185,129,0.15)] hover:shadow-[0_0_25px_rgba(16,185,129,0.3)]"
+          >
+            <svg
+              className="w-4 h-4 text-emerald-400 group-hover:text-emerald-300 transition-colors"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+            </svg>
+            <span className="text-xs font-medium text-emerald-300 group-hover:text-emerald-200 transition-colors">
+              卫星地图
+            </span>
+          </button>
+        </div>
       </div>
 
       {/* 2. 信号流演示模式 (按需渲染，因为是模态框且很少用) */}
@@ -119,7 +146,7 @@ const VisualizationPage: React.FC = () => {
           <SignalFlowDemo
             autoPlay={true}
             cycleDuration={20}
-            onExit={() => setViewMode('network')}
+            onExit={handleBack}
           />
         </div>
       )}
@@ -129,7 +156,7 @@ const VisualizationPage: React.FC = () => {
         <SensorDashboard
           active={viewMode === 'dashboard'}
           sensorId={selectedSensorId}
-          onBack={handleBackToNetwork}
+          onBack={handleBack}
         />
       </div>
 
@@ -166,19 +193,48 @@ const VisualizationPage: React.FC = () => {
 
           {/* 返回按钮 */}
           <button
-            onClick={handleBackToNetwork}
+            onClick={handleBack}
             className="absolute top-4 left-4 z-30 px-4 py-2 bg-slate-800/90 border border-slate-700 rounded-lg text-white text-sm font-medium hover:bg-slate-700 transition-colors pointer-events-auto flex items-center gap-2"
           >
             ← 返回电缆网络
           </button>
 
           <button
-            onClick={() => setViewMode('signalFlow')}
+            onClick={() => { setPreviousView(viewMode); setViewMode('signalFlow'); }}
             className="absolute bottom-12 right-4 z-30 px-3 py-1.5 bg-cyan-600/20 border border-cyan-500/50 rounded-lg text-cyan-400 text-xs font-bold hover:bg-cyan-600/30 transition-colors pointer-events-auto"
           >
             🎬 GIF 演示
           </button>
         </div>
+      </div>
+
+      {/* 5. WebGIS 卫星地图视图 */}
+      <div className={`absolute inset-0 z-40 bg-slate-900 transition-opacity duration-300 ${viewMode === 'webmap' ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
+        <CableMapViewer
+          cables={mockCables}
+          sensors={mockSensors}
+          mapboxToken={import.meta.env.VITE_MAPBOX_TOKEN || ''}
+          initialViewState={{ longitude: 112.192641, latitude: 30.337027, zoom: 15 }}
+          onSensorClick={(sensor) => {
+            setPreviousView('webmap');
+            setSelectedSensorId(sensor.id);
+            setViewMode('dashboard');
+          }}
+        />
+        {/* 返回按钮 */}
+        <button
+          onClick={handleBack}
+          className="absolute top-4 left-4 z-50 px-4 py-2 bg-slate-800/90 border border-slate-700 rounded-lg text-white text-sm font-medium hover:bg-slate-700 transition-colors pointer-events-auto flex items-center gap-2"
+        >
+          ← 返回3D视图
+        </button>
+        {/* 切换到3D网络视图 */}
+        <button
+          onClick={() => { setPreviousView(viewMode); setViewMode('network'); }}
+          className="absolute top-4 left-36 z-50 px-4 py-2 bg-slate-800/90 border border-slate-700 rounded-lg text-white text-sm font-medium hover:bg-slate-700 transition-colors pointer-events-auto flex items-center gap-2"
+        >
+          🌐 3D网络
+        </button>
       </div>
     </div>
   );
