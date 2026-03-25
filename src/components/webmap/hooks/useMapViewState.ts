@@ -2,11 +2,11 @@ import { useState, useCallback } from 'react';
 import type { MapViewState } from '@/types/map';
 
 const DEFAULT_VIEW_STATE: MapViewState = {
-  longitude: 121.4737,
-  latitude: 31.2304,
-  zoom: 14,
-  pitch: 0,
-  bearing: 0,
+  longitude: 112.192641,
+  latitude: 30.337027,
+  zoom: 15,
+  pitch: 0,     // 恢复垂直俯视视角
+  bearing: 0,   // 恢复正北朝上
 };
 
 export function useMapViewState(initialViewState?: Partial<MapViewState>) {

@@ -8,6 +8,7 @@ import SensorDashboard from '../components/SensorDashboard';
 import PerformanceMonitor from '../components/PerformanceMonitor';
 import SystemPortal from '../components/SystemPortal';
 import CableMapViewer from '../components/webmap/MapView';
+import { generateMockMapData } from '../components/webmap/utils/mockData';
 import { FaultMode, SensorData } from '../types';
 import { mockCables, mockSensors } from '../data/mockGeoData';
 
@@ -27,6 +28,9 @@ const VisualizationPage: React.FC = () => {
   const [selectedSensorId, setSelectedSensorId] = useState<string>('J1');
   // 记录上一个视图，用于返回导航
   const [previousView, setPreviousView] = useState<ViewMode>('network');
+
+  // WebGIS地图数据
+  const webmapData = useMemo(() => generateMockMapData(), []);
 
   // 进入页面时设置 body 样式
   React.useEffect(() => {
@@ -211,8 +215,8 @@ const VisualizationPage: React.FC = () => {
       {/* 5. WebGIS 卫星地图视图 */}
       <div className={`absolute inset-0 z-40 bg-slate-900 transition-opacity duration-300 ${viewMode === 'webmap' ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
         <CableMapViewer
-          cables={mockCables}
-          sensors={mockSensors}
+          cables={webmapData.cables}
+          nodes={webmapData.nodes}
           mapboxToken={import.meta.env.VITE_MAPBOX_TOKEN || ''}
           initialViewState={{ longitude: 112.192641, latitude: 30.337027, zoom: 15 }}
           onSensorClick={(sensor) => {
@@ -220,21 +224,16 @@ const VisualizationPage: React.FC = () => {
             setSelectedSensorId(sensor.id);
             setViewMode('dashboard');
           }}
+          onNodeClick={(node) => {
+            // 节点点击显示 tooltip（MapView 内部处理）
+          }}
+          onViewDetails={(node) => {
+            // 从 NodeTooltip "查看详情" 跳转到 SensorDashboard
+            setPreviousView('webmap');
+            setSelectedSensorId(node.id);
+            setViewMode('dashboard');
+          }}
         />
-        {/* 返回按钮 */}
-        <button
-          onClick={handleBack}
-          className="absolute top-4 left-4 z-50 px-4 py-2 bg-slate-800/90 border border-slate-700 rounded-lg text-white text-sm font-medium hover:bg-slate-700 transition-colors pointer-events-auto flex items-center gap-2"
-        >
-          ← 返回3D视图
-        </button>
-        {/* 切换到3D网络视图 */}
-        <button
-          onClick={() => { setPreviousView(viewMode); setViewMode('network'); }}
-          className="absolute top-4 left-36 z-50 px-4 py-2 bg-slate-800/90 border border-slate-700 rounded-lg text-white text-sm font-medium hover:bg-slate-700 transition-colors pointer-events-auto flex items-center gap-2"
-        >
-          🌐 3D网络
-        </button>
       </div>
     </div>
   );

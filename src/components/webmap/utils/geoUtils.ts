@@ -53,3 +53,71 @@ export function getScaledWidth(baseWidth: number, zoom: number): number {
   const scale = Math.max(0.5, Math.min(2, (zoom - 10) / 5));
   return baseWidth * scale;
 }
+
+/**
+ * 在两个坐标点之间生成贝塞尔曲线插值路径
+ * 模拟电缆沿道路走向的自然弯曲
+ */
+export function generateCurvedSegment(
+  p1: [number, number],
+  p2: [number, number],
+  curvature: number = 0.3,
+  segments: number = 12
+): [number, number][] {
+  const dx = p2[0] - p1[0];
+  const dy = p2[1] - p1[1];
+  const dist = Math.sqrt(dx * dx + dy * dy);
+
+  // 短距离不做曲线处理
+  if (dist < 0.001) return [p1, p2];
+
+  // 生成垂直于连线方向的控制点偏移
+  const midX = (p1[0] + p2[0]) / 2;
+  const midY = (p1[1] + p2[1]) / 2;
+
+  // 利用坐标哈希产生确定性的偏移方向，避免每次渲染结果不同
+  const hash = Math.abs(Math.sin(p1[0] * 1000 + p2[1] * 2000)) * 2 - 1;
+  const perpX = -dy * curvature * hash;
+  const perpY = dx * curvature * hash;
+
+  // 二次贝塞尔曲线控制点
+  const cpX = midX + perpX;
+  const cpY = midY + perpY;
+
+  const points: [number, number][] = [];
+  for (let i = 0; i <= segments; i++) {
+    const t = i / segments;
+    const x = (1 - t) * (1 - t) * p1[0] + 2 * (1 - t) * t * cpX + t * t * p2[0];
+    const y = (1 - t) * (1 - t) * p1[1] + 2 * (1 - t) * t * cpY + t * t * p2[1];
+    points.push([x, y]);
+  }
+
+  return points;
+}
+
+/**
+ * 对整条多段路径进行曲线平滑处理
+ * 将每段直线转为贝塞尔曲线，拼接成完整路径
+ */
+export function smoothEntirePath(
+  coordinates: [number, number][],
+  curvature: number = 0.2,
+  segmentsPerPair: number = 10
+): [number, number][] {
+  if (coordinates.length <= 1) return coordinates;
+
+  const smoothed: [number, number][] = [];
+  for (let i = 0; i < coordinates.length - 1; i++) {
+    const curved = generateCurvedSegment(
+      coordinates[i],
+      coordinates[i + 1],
+      curvature,
+      segmentsPerPair
+    );
+    // 避免重复添加连接点
+    if (i > 0) curved.shift();
+    smoothed.push(...curved);
+  }
+
+  return smoothed;
+}
