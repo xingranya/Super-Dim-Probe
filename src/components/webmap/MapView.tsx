@@ -26,10 +26,10 @@ export interface CableMapViewerProps {
 
 const DEFAULT_VIEW_STATE: MapViewState = {
   longitude: 112.192641,
-  latitude: 30.337027,
-  zoom: 14.75,
-  pitch: 18,
-  bearing: -12,
+  latitude: 30.3388,
+  zoom: 14.7,
+  pitch: 10,
+  bearing: -8,
 };
 
 const CableMapViewer: React.FC<CableMapViewerProps> = ({
@@ -149,19 +149,20 @@ const CableMapViewer: React.FC<CableMapViewerProps> = ({
         style={{ width: '100%', height: '100%' }}
       />
 
-      <div className="pointer-events-none absolute inset-0">
+      <div className="absolute inset-0 pointer-events-auto">
         <DeckGL
           viewState={viewState}
           onViewStateChange={({ viewState: nextState }) => handleViewStateChange(nextState as unknown as MapViewState)}
-          controller={false}
+          controller={true}
           layers={layers}
-          style={{ position: 'absolute', top: '0', right: '0', bottom: '0', left: '0', pointerEvents: 'none' }}
+          getCursor={({ isDragging }) => (isDragging ? 'grabbing' : 'grab')}
+          style={{ position: 'absolute', top: '0', right: '0', bottom: '0', left: '0', pointerEvents: 'auto' }}
         />
       </div>
 
       <div className="pointer-events-none absolute inset-0">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_42%,rgba(7,13,23,0.06)_0%,rgba(7,13,23,0.24)_72%,rgba(3,7,18,0.42)_100%)]" />
-        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(3,10,18,0.18)_0%,rgba(3,10,18,0.02)_28%,rgba(3,10,18,0.10)_72%,rgba(3,10,18,0.22)_100%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_44%,rgba(7,13,23,0.02)_0%,rgba(7,13,23,0.12)_72%,rgba(3,7,18,0.22)_100%)]" />
+        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(3,10,18,0.08)_0%,rgba(3,10,18,0.01)_28%,rgba(3,10,18,0.04)_72%,rgba(3,10,18,0.10)_100%)]" />
       </div>
 
       {showHUD && (

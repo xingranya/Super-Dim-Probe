@@ -87,12 +87,12 @@ const MapHUD: React.FC<MapHUDProps> = ({
 
   return (
     <>
-      <div className="absolute top-3 left-3 z-10 pointer-events-none max-w-[min(42rem,calc(100%-5.5rem))]">
-        <div className="app-panel-dark pointer-events-auto rounded-2xl px-3 py-2 sm:px-4 sm:py-2.5">
+      <div className="absolute top-3 left-3 z-10 pointer-events-none max-w-[min(38rem,calc(100%-5rem))]">
+        <div className="app-panel-dark pointer-events-auto rounded-2xl px-3 py-2 sm:px-3.5 sm:py-2">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
             <div className="flex items-center gap-2 min-w-0">
-              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-cyan-400/12 text-cyan-300">
-                <Signal size={16} />
+              <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-cyan-400/12 text-cyan-300">
+                <Signal size={14} />
               </div>
               <div className="min-w-0">
                 <div className="truncate text-sm font-semibold text-white">荆州电缆监测网络</div>
@@ -125,7 +125,7 @@ const MapHUD: React.FC<MapHUDProps> = ({
                   key={item}
                   type="button"
                   onClick={() => handleFilterChange(item)}
-                  className={`min-h-8 rounded-full px-3 text-[11px] font-medium transition-colors ${
+                  className={`min-h-7 rounded-full px-3 text-[11px] font-medium transition-colors ${
                     filter === item
                       ? 'bg-cyan-300 text-slate-950'
                       : 'bg-white/6 text-slate-300 hover:bg-white/12 hover:text-white'

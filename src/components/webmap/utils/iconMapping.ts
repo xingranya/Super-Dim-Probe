@@ -27,28 +27,17 @@ export const STATUS_COLOR_MAP = {
 function createSubstationSVG(colors: typeof NODE_COLORS.substation): string {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
     <defs>
-      <filter id="glow-s" x="-50%" y="-50%" width="200%" height="200%">
-        <feGaussianBlur stdDeviation="3" result="blur"/>
-        <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
-      </filter>
       <linearGradient id="grad-s" x1="0" y1="0" x2="0" y2="1">
         <stop offset="0%" stop-color="${colors.glow}" stop-opacity="0.9"/>
         <stop offset="100%" stop-color="${colors.primary}" stop-opacity="0.95"/>
       </linearGradient>
     </defs>
-    <!-- 外层光晕 -->
-    <rect x="8" y="8" width="48" height="48" rx="6" fill="${colors.primary}" opacity="0.15" filter="url(#glow-s)"/>
     <!-- 主体方形建筑 -->
-    <rect x="12" y="12" width="40" height="40" rx="5" fill="url(#grad-s)" stroke="${colors.stroke}" stroke-width="2"/>
+    <rect x="16" y="16" width="32" height="32" rx="7" fill="url(#grad-s)" stroke="${colors.stroke}" stroke-width="2"/>
     <!-- 内部装饰线 -->
-    <rect x="16" y="16" width="32" height="32" rx="3" fill="none" stroke="${colors.stroke}" stroke-width="0.8" opacity="0.4"/>
+    <rect x="20" y="20" width="24" height="24" rx="4" fill="none" stroke="${colors.stroke}" stroke-width="0.8" opacity="0.4"/>
     <!-- ⚡ 闪电符号 -->
     <path d="M35 18L26 34h6l-3 12 12-16h-7z" fill="white" opacity="0.95"/>
-    <!-- 角标装饰 -->
-    <circle cx="16" cy="16" r="2" fill="${colors.glow}" opacity="0.6"/>
-    <circle cx="48" cy="16" r="2" fill="${colors.glow}" opacity="0.6"/>
-    <circle cx="16" cy="48" r="2" fill="${colors.glow}" opacity="0.6"/>
-    <circle cx="48" cy="48" r="2" fill="${colors.glow}" opacity="0.6"/>
   </svg>`;
 }
 
@@ -63,21 +52,19 @@ function createJointSVG(colors: typeof NODE_COLORS.joint): string {
         <stop offset="100%" stop-color="${colors.primary}" stop-opacity="0.85"/>
       </radialGradient>
     </defs>
-    <!-- 外层光晕 -->
-    <circle cx="32" cy="32" r="28" fill="${colors.primary}" opacity="0.12"/>
     <!-- 最外圆 -->
-    <circle cx="32" cy="32" r="24" fill="url(#grad-j)" stroke="${colors.stroke}" stroke-width="1.5"/>
+    <circle cx="32" cy="32" r="18" fill="url(#grad-j)" stroke="${colors.stroke}" stroke-width="1.5"/>
     <!-- 同心圆纹理 -->
-    <circle cx="32" cy="32" r="18" fill="none" stroke="${colors.stroke}" stroke-width="0.8" opacity="0.5"/>
-    <circle cx="32" cy="32" r="12" fill="none" stroke="${colors.stroke}" stroke-width="0.8" opacity="0.4"/>
-    <circle cx="32" cy="32" r="6" fill="none" stroke="${colors.stroke}" stroke-width="0.8" opacity="0.3"/>
+    <circle cx="32" cy="32" r="12" fill="none" stroke="${colors.stroke}" stroke-width="0.8" opacity="0.5"/>
+    <circle cx="32" cy="32" r="7" fill="none" stroke="${colors.stroke}" stroke-width="0.8" opacity="0.4"/>
+    <circle cx="32" cy="32" r="3" fill="none" stroke="${colors.stroke}" stroke-width="0.8" opacity="0.3"/>
     <!-- 中心点 -->
-    <circle cx="32" cy="32" r="3" fill="white" opacity="0.8"/>
+    <circle cx="32" cy="32" r="2.5" fill="white" opacity="0.9"/>
     <!-- 十字标记 -->
-    <line x1="32" y1="14" x2="32" y2="22" stroke="white" stroke-width="1" opacity="0.4"/>
-    <line x1="32" y1="42" x2="32" y2="50" stroke="white" stroke-width="1" opacity="0.4"/>
-    <line x1="14" y1="32" x2="22" y2="32" stroke="white" stroke-width="1" opacity="0.4"/>
-    <line x1="42" y1="32" x2="50" y2="32" stroke="white" stroke-width="1" opacity="0.4"/>
+    <line x1="32" y1="16" x2="32" y2="21" stroke="white" stroke-width="1" opacity="0.4"/>
+    <line x1="32" y1="43" x2="32" y2="48" stroke="white" stroke-width="1" opacity="0.4"/>
+    <line x1="16" y1="32" x2="21" y2="32" stroke="white" stroke-width="1" opacity="0.4"/>
+    <line x1="43" y1="32" x2="48" y2="32" stroke="white" stroke-width="1" opacity="0.4"/>
   </svg>`;
 }
 
@@ -92,18 +79,16 @@ function createUserStationSVG(colors: typeof NODE_COLORS.user_station): string {
         <stop offset="100%" stop-color="${colors.primary}" stop-opacity="0.85"/>
       </linearGradient>
     </defs>
-    <!-- 外层光晕 -->
-    <circle cx="32" cy="32" r="28" fill="${colors.primary}" opacity="0.12"/>
     <!-- 底座圆 -->
-    <circle cx="32" cy="32" r="24" fill="url(#grad-u)" stroke="${colors.stroke}" stroke-width="1.5"/>
+    <circle cx="32" cy="32" r="18" fill="url(#grad-u)" stroke="${colors.stroke}" stroke-width="1.5"/>
     <!-- 建筑轮廓 - 带烟囱的工厂 -->
-    <path d="M18 44V28l6-4v-6h4v4l4-3 4 3 4-3 6 4v16z" fill="white" opacity="0.85"/>
+    <path d="M21 42V29l5-3v-5h3v3l3-2 3 2 3-2 5 3v15z" fill="white" opacity="0.88"/>
     <!-- 窗户 -->
-    <rect x="22" y="32" width="4" height="4" rx="0.5" fill="${colors.primary}" opacity="0.7"/>
-    <rect x="30" y="32" width="4" height="4" rx="0.5" fill="${colors.primary}" opacity="0.7"/>
-    <rect x="38" y="32" width="4" height="4" rx="0.5" fill="${colors.primary}" opacity="0.7"/>
+    <rect x="24" y="31" width="3" height="3" rx="0.5" fill="${colors.primary}" opacity="0.7"/>
+    <rect x="31" y="31" width="3" height="3" rx="0.5" fill="${colors.primary}" opacity="0.7"/>
+    <rect x="38" y="31" width="3" height="3" rx="0.5" fill="${colors.primary}" opacity="0.7"/>
     <!-- 门 -->
-    <rect x="29" y="38" width="6" height="6" rx="0.5" fill="${colors.primary}" opacity="0.5"/>
+    <rect x="29" y="37" width="6" height="5" rx="0.5" fill="${colors.primary}" opacity="0.5"/>
   </svg>`;
 }
 
@@ -118,12 +103,10 @@ function createGroundingSVG(colors: typeof NODE_COLORS.grounding): string {
         <stop offset="100%" stop-color="${colors.primary}" stop-opacity="0.85"/>
       </linearGradient>
     </defs>
-    <!-- 外层光晕 -->
-    <polygon points="32,4 56,18 56,46 32,60 8,46 8,18" fill="${colors.primary}" opacity="0.12"/>
     <!-- 六边形主体 -->
-    <polygon points="32,8 52,20 52,44 32,56 12,44 12,20" fill="url(#grad-g)" stroke="${colors.stroke}" stroke-width="1.5"/>
+    <polygon points="32,14 46,22 46,42 32,50 18,42 18,22" fill="url(#grad-g)" stroke="${colors.stroke}" stroke-width="1.5"/>
     <!-- 内部六边形 -->
-    <polygon points="32,14 46,22 46,42 32,50 18,42 18,22" fill="none" stroke="${colors.stroke}" stroke-width="0.6" opacity="0.3"/>
+    <polygon points="32,18 42,24 42,40 32,46 22,40 22,24" fill="none" stroke="${colors.stroke}" stroke-width="0.6" opacity="0.3"/>
     <!-- 接地符号 ⏚ -->
     <line x1="32" y1="20" x2="32" y2="34" stroke="white" stroke-width="2.5" opacity="0.9"/>
     <line x1="22" y1="34" x2="42" y2="34" stroke="white" stroke-width="2.5" opacity="0.9"/>
@@ -143,10 +126,8 @@ function createSwitchStationSVG(colors: typeof NODE_COLORS.switch_station): stri
         <stop offset="100%" stop-color="${colors.primary}" stop-opacity="0.85"/>
       </linearGradient>
     </defs>
-    <!-- 外层光晕 -->
-    <rect x="6" y="6" width="52" height="52" rx="10" fill="${colors.primary}" opacity="0.12"/>
     <!-- 圆角方形主体 -->
-    <rect x="10" y="10" width="44" height="44" rx="8" fill="url(#grad-sw)" stroke="${colors.stroke}" stroke-width="1.5"/>
+    <rect x="16" y="16" width="32" height="32" rx="8" fill="url(#grad-sw)" stroke="${colors.stroke}" stroke-width="1.5"/>
     <!-- 开关符号 -->
     <circle cx="24" cy="38" r="3" fill="white" opacity="0.9"/>
     <circle cx="40" cy="24" r="3" fill="white" opacity="0.9"/>
@@ -189,11 +170,11 @@ export function getNodeIconUrl(nodeType: NodeType): string {
 
 /** 节点渲染尺寸配置 (像素) */
 export const NODE_ICON_SIZES: Record<NodeType, number> = {
-  substation: 42,
-  switch_station: 34,
-  joint: 24,
-  user_station: 26,
-  grounding: 22,
+  substation: 52,
+  switch_station: 42,
+  joint: 28,
+  user_station: 32,
+  grounding: 26,
 };
 
 // 兼容旧接口 - 保留 NODE_ICONS 导出

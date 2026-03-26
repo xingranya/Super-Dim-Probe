@@ -1,4 +1,4 @@
-import { ScatterplotLayer, IconLayer } from '@deck.gl/layers';
+import { ScatterplotLayer, IconLayer, TextLayer } from '@deck.gl/layers';
 import type { MapNode } from '@/types/map';
 import { NODE_TYPE_SIZES } from '@/types/map';
 import { hexToRgba } from '../utils/geoUtils';
@@ -50,8 +50,8 @@ export function createRealisticNodeLayer(
       return [rgb[0], rgb[1], rgb[2], alpha] as [number, number, number, number];
     },
     getRadius: d => (NODE_TYPE_SIZES[d.nodeType] || 8) * (d.id === selectedNodeId ? 2.5 : 1.8),
-    radiusMinPixels: 10,
-    radiusMaxPixels: 38,
+    radiusMinPixels: 14,
+    radiusMaxPixels: 48,
     pickable: false,
     updateTriggers: {
       getFillColor: [highlightedNodes.map(n => `${n.id}-${n.status}`).join(',')],
@@ -65,8 +65,8 @@ export function createRealisticNodeLayer(
     getPosition: d => d.position,
     getFillColor: [11, 18, 32, 45],
     getRadius: d => (NODE_TYPE_SIZES[d.nodeType] || 8) * 1.1,
-    radiusMinPixels: 8,
-    radiusMaxPixels: 24,
+    radiusMinPixels: 10,
+    radiusMaxPixels: 30,
     pickable: false,
   });
   layers.push(iconShadowLayer);
@@ -82,8 +82,8 @@ export function createRealisticNodeLayer(
       anchorY: 32,
     }),
     getSize: d => NODE_ICON_SIZES[d.nodeType] || 32,
-    sizeMinPixels: 20,
-    sizeMaxPixels: 52,
+    sizeMinPixels: 26,
+    sizeMaxPixels: 74,
     pickable: true,
     autoHighlight: true,
     highlightColor: [255, 255, 255, 36],
@@ -106,8 +106,8 @@ export function createRealisticNodeLayer(
       const base = NODE_ICON_SIZES[d.nodeType] || 24;
       return d.nodeType === 'substation' ? base * 0.38 : base * 0.42;
     },
-    radiusMinPixels: 7,
-    radiusMaxPixels: 18,
+    radiusMinPixels: 9,
+    radiusMaxPixels: 24,
     pickable: false,
     stroked: true,
     filled: false,
@@ -131,15 +131,45 @@ export function createRealisticNodeLayer(
       const sc = STATUS_COLOR_MAP[d.status] || STATUS_COLOR_MAP.normal;
       return hexToRgba(sc.fill, 255);
     },
-    getRadius: 3.2,
-    radiusMinPixels: 2,
-    radiusMaxPixels: 6,
+    getRadius: 3.8,
+    radiusMinPixels: 3,
+    radiusMaxPixels: 8,
     pickable: false,
     stroked: true,
     getLineColor: [255, 255, 255, 200],
     lineWidthMinPixels: 1,
   });
   layers.push(statusCenterLayer);
+
+  const labelNodes = visibleNodes.filter(
+    (node) =>
+      node.id === selectedNodeId ||
+      node.status === 'warning' ||
+      node.status === 'fault' ||
+      (zoom >= 15.2 && (node.nodeType === 'substation' || node.renderPriority === 'primary'))
+  );
+
+  const labelLayer = new TextLayer<MapNode>({
+    id: 'node-labels',
+    data: labelNodes,
+    getPosition: (node) => node.position,
+    getText: (node) => node.name,
+    getColor: [255, 255, 255, 240],
+    getSize: (node) => (node.status === 'fault' || node.status === 'warning' ? 13 : 12),
+    sizeMinPixels: 11,
+    sizeMaxPixels: 18,
+    getPixelOffset: [0, 22],
+    getBackgroundColor: [7, 14, 24, 182],
+    backgroundPadding: [6, 4],
+    getBorderColor: [255, 255, 255, 30],
+    getBorderWidth: 1,
+    billboard: true,
+    pickable: false,
+    characterSet: 'auto',
+    fontFamily: 'Noto Sans SC, IBM Plex Sans, sans-serif',
+    fontWeight: 600,
+  });
+  layers.push(labelLayer);
 
   return layers;
 }

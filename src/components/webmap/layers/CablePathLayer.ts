@@ -4,10 +4,10 @@ import { VOLTAGE_COLORS } from '@/types/map';
 import { hexToRgba, smoothEntirePath } from '../utils/geoUtils';
 
 const LINE_STYLE: Record<string, { color: string; width: number; opacity: number; glow: number }> = {
-  '220kV': { color: '#6e8ab2', width: 4.2, opacity: 210, glow: 28 },
-  '110kV': { color: '#5c84b1', width: 3.4, opacity: 205, glow: 24 },
-  '35kV': { color: '#5f987e', width: 2.3, opacity: 178, glow: 16 },
-  '10kV': { color: '#ab8d5c', width: 1.5, opacity: 144, glow: 10 },
+  '220kV': { color: '#8ba9d6', width: 5.2, opacity: 248, glow: 92 },
+  '110kV': { color: '#6f96d2', width: 4.3, opacity: 240, glow: 82 },
+  '35kV': { color: '#62b785', width: 3.1, opacity: 225, glow: 62 },
+  '10kV': { color: '#d8b06a', width: 2.2, opacity: 210, glow: 48 },
 };
 
 interface CableLayerOptions {
@@ -35,6 +35,21 @@ export function createCablePathLayer(cables: CablePath[], options?: CableLayerOp
   }));
   const layers = [];
 
+  const casingLayer = new PathLayer<typeof smoothedCables[0]>({
+    id: 'cable-casing',
+    data: smoothedCables,
+    getPath: (d) => d._smoothed,
+    getColor: [255, 255, 255, 76],
+    getWidth: (d) => (LINE_STYLE[d.voltageLevel] || LINE_STYLE['110kV']).width * 1.55,
+    widthMinPixels: 2.5,
+    widthMaxPixels: 12,
+    jointRounded: true,
+    capRounded: true,
+    pickable: false,
+    billboard: false,
+  });
+  layers.push(casingLayer);
+
   const glowLayer = new PathLayer<typeof smoothedCables[0]>({
     id: 'cable-glow',
     data: smoothedCables,
@@ -45,8 +60,8 @@ export function createCablePathLayer(cables: CablePath[], options?: CableLayerOp
       return hexToRgba(hex, style.glow);
     },
     getWidth: d => (LINE_STYLE[d.voltageLevel] || LINE_STYLE['110kV']).width * 1.6,
-    widthMinPixels: 1,
-    widthMaxPixels: 12,
+    widthMinPixels: 2,
+    widthMaxPixels: 18,
     jointRounded: true,
     capRounded: true,
     pickable: false,
@@ -67,8 +82,8 @@ export function createCablePathLayer(cables: CablePath[], options?: CableLayerOp
       return hexToRgba(hex, style.opacity);
     },
     getWidth: d => (LINE_STYLE[d.voltageLevel] || LINE_STYLE['110kV']).width,
-    widthMinPixels: 1,
-    widthMaxPixels: 6,
+    widthMinPixels: 1.5,
+    widthMaxPixels: 9,
     jointRounded: true,
     capRounded: true,
     pickable: true,
