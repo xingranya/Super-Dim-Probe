@@ -1,63 +1,79 @@
 import { ScatterplotLayer, IconLayer } from '@deck.gl/layers';
 import type { MapNode } from '@/types/map';
-import { STATUS_COLORS, NODE_TYPE_SIZES } from '@/types/map';
+import { NODE_TYPE_SIZES } from '@/types/map';
 import { hexToRgba } from '../utils/geoUtils';
-import { getNodeIconUrl, NODE_ICON_SIZES, NODE_COLORS, STATUS_COLOR_MAP } from '../utils/iconMapping';
+import { getNodeIconUrl, NODE_ICON_SIZES, STATUS_COLOR_MAP } from '../utils/iconMapping';
+
+interface NodeClickContext {
+  x?: number;
+  y?: number;
+}
+
+interface NodeLayerOptions {
+  zoom: number;
+  selectedNodeId?: string | null;
+  onClick?: (node: MapNode, context?: NodeClickContext) => void;
+}
+
+const isNodeVisible = (node: MapNode, zoom: number) => {
+  if (node.status === 'warning' || node.status === 'fault') return true;
+  if (node.nodeType === 'substation') return true;
+  if (zoom < 14.2) return false;
+  if (zoom < 15.2) return node.nodeType === 'grounding' || node.renderPriority !== 'tertiary';
+  return true;
+};
 
 /**
- * 创建真实感节点渲染层 - 使用 IconLayer + SVG 自定义图标
- * 多层叠加: 底层光晕 → 图标主体 → 状态指示灯
+ * 创建真实感节点渲染层 - 降低装饰性，强化 GIS 分级
  */
 export function createRealisticNodeLayer(
   nodes: MapNode[],
-  onClick?: (node: MapNode) => void
+  options?: NodeLayerOptions
 ) {
+  const zoom = options?.zoom ?? 15;
+  const selectedNodeId = options?.selectedNodeId;
+  const onClick = options?.onClick;
+  const visibleNodes = nodes.filter((node) => isNodeVisible(node, zoom));
+  const highlightedNodes = visibleNodes.filter(
+    (node) => node.id === selectedNodeId || node.status === 'warning' || node.status === 'fault' || node.nodeType === 'substation'
+  );
   const layers = [];
 
-  // 1. 底层 - 柔和辐射光晕 (模拟设备周围的环境光)
-  const outerGlowLayer = new ScatterplotLayer<MapNode>({
-    id: 'node-outer-glow',
-    data: nodes,
+  const focusHaloLayer = new ScatterplotLayer<MapNode>({
+    id: 'node-focus-halo',
+    data: highlightedNodes,
     getPosition: d => d.position,
     getFillColor: d => {
-      const colors = NODE_COLORS[d.nodeType];
-      const rgb = hexToRgba(colors.primary);
-      return [rgb[0], rgb[1], rgb[2], 25] as [number, number, number, number];
+      const statusColor = STATUS_COLOR_MAP[d.status] || STATUS_COLOR_MAP.normal;
+      const rgb = hexToRgba(statusColor.fill);
+      const alpha = d.id === selectedNodeId ? 38 : d.status === 'normal' ? 18 : 28;
+      return [rgb[0], rgb[1], rgb[2], alpha] as [number, number, number, number];
     },
-    getRadius: d => (NODE_TYPE_SIZES[d.nodeType] || 8) * 3.5,
-    radiusMinPixels: 16,
-    radiusMaxPixels: 70,
-    pickable: false,
-    updateTriggers: {
-      getFillColor: [nodes.map(n => n.nodeType).join(',')],
-    },
-  });
-  layers.push(outerGlowLayer);
-
-  // 2. 中层 - 内层光晕 (增强层次感)
-  const innerGlowLayer = new ScatterplotLayer<MapNode>({
-    id: 'node-inner-glow',
-    data: nodes,
-    getPosition: d => d.position,
-    getFillColor: d => {
-      const colors = NODE_COLORS[d.nodeType];
-      const rgb = hexToRgba(colors.glow);
-      return [rgb[0], rgb[1], rgb[2], 50] as [number, number, number, number];
-    },
-    getRadius: d => (NODE_TYPE_SIZES[d.nodeType] || 8) * 2,
+    getRadius: d => (NODE_TYPE_SIZES[d.nodeType] || 8) * (d.id === selectedNodeId ? 2.5 : 1.8),
     radiusMinPixels: 10,
-    radiusMaxPixels: 45,
+    radiusMaxPixels: 38,
     pickable: false,
     updateTriggers: {
-      getFillColor: [nodes.map(n => n.nodeType).join(',')],
+      getFillColor: [highlightedNodes.map(n => `${n.id}-${n.status}`).join(',')],
     },
   });
-  layers.push(innerGlowLayer);
+  layers.push(focusHaloLayer);
 
-  // 3. 主体层 - IconLayer 渲染自定义 SVG 图标
+  const iconShadowLayer = new ScatterplotLayer<MapNode>({
+    id: 'node-icon-shadow',
+    data: visibleNodes,
+    getPosition: d => d.position,
+    getFillColor: [11, 18, 32, 45],
+    getRadius: d => (NODE_TYPE_SIZES[d.nodeType] || 8) * 1.1,
+    radiusMinPixels: 8,
+    radiusMaxPixels: 24,
+    pickable: false,
+  });
+  layers.push(iconShadowLayer);
+
   const iconLayer = new IconLayer<MapNode>({
     id: 'node-icon-main',
-    data: nodes,
+    data: visibleNodes,
     getPosition: d => d.position,
     getIcon: d => ({
       url: getNodeIconUrl(d.nodeType),
@@ -67,43 +83,63 @@ export function createRealisticNodeLayer(
     }),
     getSize: d => NODE_ICON_SIZES[d.nodeType] || 32,
     sizeMinPixels: 20,
-    sizeMaxPixels: 64,
+    sizeMaxPixels: 52,
     pickable: true,
     autoHighlight: true,
-    highlightColor: [255, 255, 255, 80],
-    onClick: onClick ? ({ object }) => object && onClick(object) : undefined,
+    highlightColor: [255, 255, 255, 36],
+    onClick: onClick
+      ? ({ object, x, y }) => object && onClick(object, { x, y })
+      : undefined,
     updateTriggers: {
-      getIcon: [nodes.map(n => n.nodeType).join(',')],
-      getSize: [nodes.map(n => n.nodeType).join(',')],
+      getIcon: [visibleNodes.map(n => n.nodeType).join(',')],
+      getSize: [visibleNodes.map(n => n.nodeType).join(',')],
     },
   });
   layers.push(iconLayer);
 
-  // 4. 顶层 - 状态指示灯 (小圆点 + 白色外描边)
-  const statusIndicator = new ScatterplotLayer<MapNode>({
-    id: 'node-status-indicator',
-    data: nodes,
+  const statusRingLayer = new ScatterplotLayer<MapNode>({
+    id: 'node-status-ring',
+    data: visibleNodes,
+    getPosition: d => d.position,
+    getFillColor: [0, 0, 0, 0],
+    getRadius: d => {
+      const base = NODE_ICON_SIZES[d.nodeType] || 24;
+      return d.nodeType === 'substation' ? base * 0.38 : base * 0.42;
+    },
+    radiusMinPixels: 7,
+    radiusMaxPixels: 18,
+    pickable: false,
+    stroked: true,
+    filled: false,
+    getLineColor: d => {
+      const sc = STATUS_COLOR_MAP[d.status] || STATUS_COLOR_MAP.normal;
+      return hexToRgba(sc.fill, d.status === 'normal' ? 150 : 230);
+    },
+    lineWidthMinPixels: 1.2,
+    updateTriggers: {
+      getFillColor: [visibleNodes.map(n => n.status).join(',')],
+      getLineColor: [visibleNodes.map(n => n.status).join(',')],
+    },
+  });
+  layers.push(statusRingLayer);
+
+  const statusCenterLayer = new ScatterplotLayer<MapNode>({
+    id: 'node-status-core',
+    data: visibleNodes.filter((node) => node.status !== 'normal'),
     getPosition: d => d.position,
     getFillColor: d => {
       const sc = STATUS_COLOR_MAP[d.status] || STATUS_COLOR_MAP.normal;
       return hexToRgba(sc.fill, 255);
     },
-    getRadius: d => {
-      if (d.nodeType === 'substation') return 4;
-      if (d.nodeType === 'user_station') return 3;
-      return 2.5;
-    },
-    radiusMinPixels: 3,
-    radiusMaxPixels: 10,
+    getRadius: 3.2,
+    radiusMinPixels: 2,
+    radiusMaxPixels: 6,
     pickable: false,
     stroked: true,
     getLineColor: [255, 255, 255, 200],
-    lineWidthMinPixels: 1.5,
-    updateTriggers: {
-      getFillColor: [nodes.map(n => n.status).join(',')],
-    },
+    lineWidthMinPixels: 1,
   });
-  layers.push(statusIndicator);
+  layers.push(statusCenterLayer);
 
   return layers;
 }
@@ -112,7 +148,9 @@ export function createRealisticNodeLayer(
  * 创建脉冲动画层 - 告警/故障节点的呼吸光效
  */
 export function createPulseAnimationLayer(nodes: MapNode[]) {
-  const alertNodes = nodes.filter(n => n.status === 'warning' || n.status === 'fault');
+  const alertNodes = nodes.filter(
+    (node) => isNodeVisible(node, 99) && (node.status === 'warning' || node.status === 'fault')
+  );
   const layers = [];
 
   if (alertNodes.length === 0) return layers;
@@ -123,16 +161,16 @@ export function createPulseAnimationLayer(nodes: MapNode[]) {
     data: alertNodes,
     getPosition: d => d.position,
     getFillColor: [0, 0, 0, 0],
-    getRadius: 35,
-    radiusMinPixels: 18,
-    radiusMaxPixels: 70,
+    getRadius: 18,
+    radiusMinPixels: 10,
+    radiusMaxPixels: 34,
     pickable: false,
     stroked: true,
     getLineColor: d => {
-      if (d.status === 'fault') return [239, 68, 68, 120];
-      return [245, 158, 11, 80];
+      if (d.status === 'fault') return [232, 93, 117, 120];
+      return [230, 162, 60, 96];
     },
-    lineWidthMinPixels: 2,
+    lineWidthMinPixels: 1.5,
     updateTriggers: {
       getLineColor: [alertNodes.map(n => n.status).join(',')],
     },
@@ -145,16 +183,16 @@ export function createPulseAnimationLayer(nodes: MapNode[]) {
     data: alertNodes,
     getPosition: d => d.position,
     getFillColor: [0, 0, 0, 0],
-    getRadius: 20,
-    radiusMinPixels: 12,
-    radiusMaxPixels: 45,
+    getRadius: 10,
+    radiusMinPixels: 6,
+    radiusMaxPixels: 20,
     pickable: false,
     stroked: true,
     getLineColor: d => {
-      if (d.status === 'fault') return [239, 68, 68, 180];
-      return [245, 158, 11, 130];
+      if (d.status === 'fault') return [232, 93, 117, 180];
+      return [230, 162, 60, 140];
     },
-    lineWidthMinPixels: 2,
+    lineWidthMinPixels: 1.2,
     updateTriggers: {
       getLineColor: [alertNodes.map(n => n.status).join(',')],
     },

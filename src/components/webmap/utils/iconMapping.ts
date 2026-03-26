@@ -7,18 +7,18 @@ import type { NodeType } from '@/types/map';
 
 // 节点颜色配置 (用于 SVG 填充)
 export const NODE_COLORS: Record<NodeType, { primary: string; glow: string; stroke: string }> = {
-  substation: { primary: '#3b82f6', glow: '#60a5fa', stroke: '#93c5fd' },     // 蓝色 - 变电站
-  joint: { primary: '#64748b', glow: '#94a3b8', stroke: '#cbd5e1' },          // 灰色 - 接头井
-  switch_station: { primary: '#8b5cf6', glow: '#a78bfa', stroke: '#c4b5fd' }, // 紫色 - 开关站
-  user_station: { primary: '#22c55e', glow: '#4ade80', stroke: '#86efac' },   // 绿色 - 用户站
-  grounding: { primary: '#f59e0b', glow: '#fbbf24', stroke: '#fcd34d' },      // 橙色 - 接地箱
+  substation: { primary: '#5b6e82', glow: '#8ea1b4', stroke: '#d4dde6' },
+  joint: { primary: '#5c6672', glow: '#87919c', stroke: '#d4dbe2' },
+  switch_station: { primary: '#677181', glow: '#909aac', stroke: '#d7dce4' },
+  user_station: { primary: '#60707d', glow: '#91a0ab', stroke: '#d7dee5' },
+  grounding: { primary: '#6d675c', glow: '#9a907f', stroke: '#e4dccb' },
 };
 
 // 状态颜色 (用于状态光点和光晕)
 export const STATUS_COLOR_MAP = {
-  normal: { fill: '#22c55e', glow: 'rgba(34,197,94,0.4)' },
-  warning: { fill: '#f59e0b', glow: 'rgba(245,158,11,0.5)' },
-  fault: { fill: '#ef4444', glow: 'rgba(239,68,68,0.6)' },
+  normal: { fill: '#3bc08b', glow: 'rgba(59,192,139,0.24)' },
+  warning: { fill: '#e6a23c', glow: 'rgba(230,162,60,0.3)' },
+  fault: { fill: '#e85d75', glow: 'rgba(232,93,117,0.36)' },
 } as const;
 
 /**
@@ -189,11 +189,11 @@ export function getNodeIconUrl(nodeType: NodeType): string {
 
 /** 节点渲染尺寸配置 (像素) */
 export const NODE_ICON_SIZES: Record<NodeType, number> = {
-  substation: 52,
-  switch_station: 42,
-  joint: 32,
-  user_station: 38,
-  grounding: 30,
+  substation: 42,
+  switch_station: 34,
+  joint: 24,
+  user_station: 26,
+  grounding: 22,
 };
 
 // 兼容旧接口 - 保留 NODE_ICONS 导出

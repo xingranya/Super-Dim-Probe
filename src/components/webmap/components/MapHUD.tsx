@@ -1,237 +1,212 @@
-import React, { useState, useEffect } from 'react';
-import { Activity, AlertTriangle, CheckCircle, Zap, Thermometer, Signal, ChevronDown, ChevronUp } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Activity, AlertTriangle, ChevronDown, ChevronUp, Signal, Zap } from 'lucide-react';
 import type { MapNode } from '@/types/map';
-import { seededRange } from '@/utils/mockMetrics';
 
 interface MapHUDProps {
   nodes: MapNode[];
-  cables?: any[];
   onNodeSelect?: (node: MapNode) => void;
   onFilterChange?: (filter: 'all' | 'normal' | 'warning' | 'fault') => void;
   selectedNodeId?: string | null;
+  zoom: number;
 }
+
+const isNodeVisibleInPanel = (node: MapNode, zoom: number) => {
+  if (node.status === 'warning' || node.status === 'fault') return true;
+  if (node.nodeType === 'substation') return true;
+  if (zoom < 14.2) return false;
+  if (zoom < 15.2) return node.renderPriority !== 'tertiary' || node.nodeType === 'grounding';
+  return true;
+};
+
+const getNodeLabel = (node: MapNode) => {
+  if (node.nodeType === 'substation') return '变电站';
+  if (node.nodeType === 'grounding') return '接地箱';
+  if (node.nodeType === 'user_station') return '用户站';
+  if (node.nodeType === 'switch_station') return '开关站';
+  return '环网柜';
+};
+
+const getStatusTone = (status: MapNode['status']) => {
+  if (status === 'fault') return 'text-rose-300 border-rose-400/30 bg-rose-400/12';
+  if (status === 'warning') return 'text-amber-200 border-amber-400/30 bg-amber-400/10';
+  return 'text-emerald-200 border-emerald-400/20 bg-emerald-400/8';
+};
 
 const MapHUD: React.FC<MapHUDProps> = ({
   nodes,
   onNodeSelect,
   onFilterChange,
   selectedNodeId,
+  zoom,
 }) => {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [filter, setFilter] = useState<'all' | 'normal' | 'warning' | 'fault'>('all');
-  const [panelExpanded, setPanelExpanded] = useState(false); // 默认收起
+  const [panelExpanded, setPanelExpanded] = useState(false);
 
-  // 实时时钟
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
 
-  // 统计数据
-  const stats = {
-    total: nodes.length,
-    normal: nodes.filter(n => n.status === 'normal').length,
-    warning: nodes.filter(n => n.status === 'warning').length,
-    fault: nodes.filter(n => n.status === 'fault').length,
+  const visibleNodes = useMemo(
+    () => nodes.filter((node) => isNodeVisibleInPanel(node, zoom)),
+    [nodes, zoom]
+  );
+
+  const stats = useMemo(() => ({
+    normal: nodes.filter((node) => node.status === 'normal').length,
+    warning: nodes.filter((node) => node.status === 'warning').length,
+    fault: nodes.filter((node) => node.status === 'fault').length,
+  }), [nodes]);
+
+  const handleFilterChange = (nextFilter: 'all' | 'normal' | 'warning' | 'fault') => {
+    setFilter(nextFilter);
+    onFilterChange?.(nextFilter);
   };
 
-  const handleFilterChange = (newFilter: 'all' | 'normal' | 'warning' | 'fault') => {
-    setFilter(newFilter);
-    onFilterChange?.(newFilter);
-  };
+  const filteredNodes = useMemo(() => {
+    if (filter === 'all') return visibleNodes;
+    return visibleNodes.filter((node) => node.status === filter);
+  }, [filter, visibleNodes]);
 
-  // 过滤后的节点
-  const filteredNodes = filter === 'all'
-    ? nodes
-    : nodes.filter(n => n.status === filter);
+  const groupedNodes = useMemo(() => {
+    const abnormal = filteredNodes.filter((node) => node.status === 'warning' || node.status === 'fault');
+    const core = filteredNodes.filter(
+      (node) => node.status === 'normal' && (node.nodeType === 'substation' || node.renderPriority === 'primary')
+    );
+    const all = filteredNodes.filter(
+      (node) => !abnormal.some((item) => item.id === node.id) && !core.some((item) => item.id === node.id)
+    );
 
-  const stableTemperatures = React.useMemo(() => {
-    return Object.fromEntries(
-      filteredNodes.map((node) => [node.id, seededRange(`${node.id}-hud-temp`, 30, 50, 0)])
-    ) as Record<string, number>;
+    return [
+      { id: 'abnormal', title: '异常节点', nodes: abnormal },
+      { id: 'core', title: '核心节点', nodes: core },
+      { id: 'all', title: '全部节点', nodes: all },
+    ].filter((group) => group.nodes.length > 0);
   }, [filteredNodes]);
 
   return (
     <>
-      {/* 顶部状态栏 - 左侧固定，右侧留出空间给展开按钮 */}
-      <div className="absolute top-4 left-4 z-10 flex items-center justify-between pointer-events-none max-w-[calc(100%-200px)]">
-        <div className="bg-[#0a0f1a]/90 backdrop-blur-sm border border-[#00d4ff]/30 rounded-xl px-5 py-3 pointer-events-auto shadow-lg shadow-cyan-500/10 flex items-center gap-6">
-          <div className="flex items-center gap-2">
-            <div className="p-1.5 bg-[#00d4ff]/20 rounded-lg">
-              <Signal size={18} className="text-[#00d4ff]" />
+      <div className="absolute top-3 left-3 z-10 pointer-events-none max-w-[min(42rem,calc(100%-5.5rem))]">
+        <div className="app-panel-dark pointer-events-auto rounded-2xl px-3 py-2 sm:px-4 sm:py-2.5">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-cyan-400/12 text-cyan-300">
+                <Signal size={16} />
+              </div>
+              <div className="min-w-0">
+                <div className="truncate text-sm font-semibold text-white">荆州电缆监测网络</div>
+                <div className="text-[11px] text-slate-400">
+                  {currentTime.toLocaleTimeString('zh-CN', { hour12: false })}
+                </div>
+              </div>
             </div>
-            <div>
-              <h2 className="text-white font-bold text-sm">荆州电缆监测网络</h2>
-              <p className="text-[#00d4ff]/60 text-[10px]">
-                {currentTime.toLocaleTimeString('zh-CN', { hour12: false })}
-              </p>
-            </div>
-          </div>
 
-          {/* 分割线 */}
-          <div className="w-px h-8 bg-white/10" />
+            <div className="hidden h-6 w-px bg-white/10 sm:block" />
 
-          {/* 统计 */}
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-1.5">
-              <div className="w-2 h-2 rounded-full bg-emerald-400" />
-              <span className="text-white/70 text-xs">{stats.normal}</span>
+            <div className="flex items-center gap-3 text-xs text-slate-200">
+              <span className="inline-flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-emerald-400" />
+                {stats.normal}
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-amber-400" />
+                {stats.warning}
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-rose-400" />
+                {stats.fault}
+              </span>
             </div>
-            <div className="flex items-center gap-1.5">
-              <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-              <span className="text-white/70 text-xs">{stats.warning}</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-              <span className="text-white/70 text-xs">{stats.fault}</span>
-            </div>
-          </div>
 
-          {/* 分割线 */}
-          <div className="w-px h-8 bg-white/10" />
-
-          {/* 筛选按钮 */}
-          <div className="flex gap-1">
-            {(['all', 'normal', 'warning', 'fault'] as const).map(f => (
-              <button
-                key={f}
-                onClick={() => handleFilterChange(f)}
-                className={`
-                  px-2.5 py-1 rounded-md text-[11px] font-medium transition-all
-                  ${filter === f
-                    ? 'bg-[#00d4ff] text-[#0a0f1a]'
-                    : 'bg-white/5 text-white/60 hover:text-white'
-                  }
-                `}
-              >
-                {f === 'all' ? '全部' : f === 'normal' ? '正常' : f === 'warning' ? '告警' : '故障'}
-              </button>
-            ))}
+            <div className="flex flex-wrap gap-1 sm:ml-auto">
+              {(['all', 'normal', 'warning', 'fault'] as const).map((item) => (
+                <button
+                  key={item}
+                  type="button"
+                  onClick={() => handleFilterChange(item)}
+                  className={`min-h-8 rounded-full px-3 text-[11px] font-medium transition-colors ${
+                    filter === item
+                      ? 'bg-cyan-300 text-slate-950'
+                      : 'bg-white/6 text-slate-300 hover:bg-white/12 hover:text-white'
+                  }`}
+                >
+                  {item === 'all' ? '全部' : item === 'normal' ? '正常' : item === 'warning' ? '告警' : '故障'}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </div>
 
-      {/* 右侧收起/展开按钮 - 始终显示 */}
-      <div className="absolute top-4 right-4 z-20">
+      <div className="absolute top-3 right-3 z-20">
         <button
-          onClick={() => setPanelExpanded(!panelExpanded)}
           type="button"
+          onClick={() => setPanelExpanded((current) => !current)}
           aria-label={panelExpanded ? '收起监测节点面板' : '展开监测节点面板'}
           aria-expanded={panelExpanded}
-          className="bg-[#0a0f1a]/90 backdrop-blur-sm border border-[#00d4ff]/30 rounded-lg px-3 py-2 flex items-center gap-2 shadow-lg shadow-cyan-500/10 hover:bg-[#0a0f1a] transition-all app-focus-dark"
+          className="app-panel-dark app-focus-dark flex min-h-10 items-center gap-2 rounded-2xl px-3 py-2 text-white"
         >
-          <Activity size={14} className="text-[#00d4ff]" />
-          <span className="text-white text-xs font-medium">
-            监测节点 ({filteredNodes.length})
-          </span>
-          {panelExpanded ? (
-            <ChevronUp size={14} className="text-[#00d4ff]" />
-          ) : (
-            <ChevronDown size={14} className="text-[#00d4ff]" />
-          )}
+          <Activity size={14} className="text-cyan-300" />
+          <span className="text-xs font-medium">监测节点</span>
+          <span className="rounded-full bg-white/8 px-2 py-0.5 text-[10px] text-slate-300">{filteredNodes.length}</span>
+          {panelExpanded ? <ChevronUp size={14} className="text-cyan-300" /> : <ChevronDown size={14} className="text-cyan-300" />}
         </button>
       </div>
 
-      {/* 右侧节点详情面板 - 可展开/收起 */}
-      <div className={`
-        absolute top-16 right-4 w-80 z-10 pointer-events-auto
-        transition-all duration-300 ease-in-out overflow-hidden
-        ${panelExpanded ? 'bottom-4 opacity-100' : 'h-0 opacity-0'}
-      `}>
-        <div className="bg-[#0a0f1a]/90 backdrop-blur-sm border border-[#00d4ff]/30 rounded-xl h-full flex flex-col shadow-lg shadow-cyan-500/10 overflow-hidden">
-          {/* 节点列表 */}
-          <div className="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-1">
-            {filteredNodes.map(node => (
-              <button
-                key={node.id}
-                onClick={() => onNodeSelect?.(node)}
-                className={`
-                  w-full flex items-center gap-3 p-3 rounded-lg transition-all text-left
-                  ${selectedNodeId === node.id
-                    ? 'bg-[#00d4ff]/20 border border-[#00d4ff]/50'
-                    : 'bg-[#0a0f1a]/50 border border-transparent hover:border-white/20'
-                  }
-                `}
-              >
-                {/* 节点图标 */}
-                <div className={`
-                  w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0
-                  ${node.nodeType === 'substation' ? 'bg-blue-500/20 text-blue-400' : ''}
-                  ${node.nodeType === 'joint' ? 'bg-slate-500/20 text-slate-400' : ''}
-                  ${node.nodeType === 'user_station' ? 'bg-emerald-500/20 text-emerald-400' : ''}
-                  ${node.nodeType === 'grounding' ? 'bg-amber-500/20 text-amber-400' : ''}
-                `}>
-                  <Zap size={14} />
+      <div
+        className={`absolute z-20 pointer-events-auto transition-all duration-300 ease-out ${
+          panelExpanded ? 'opacity-100 translate-y-0' : 'opacity-0 pointer-events-none -translate-y-2'
+        } top-16 right-3 w-[min(22rem,calc(100vw-1.5rem))] md:w-80`}
+      >
+        <div className="app-panel-dark rounded-2xl overflow-hidden">
+          <div className="max-h-[min(70vh,34rem)] overflow-y-auto app-scrollbar px-3 py-3">
+            {groupedNodes.map((group) => (
+              <div key={group.id} className="mb-4 last:mb-0">
+                <div className="mb-2 px-1 text-[11px] font-medium tracking-[0.12em] text-slate-500 uppercase">
+                  {group.title}
                 </div>
-
-                {/* 节点信息 */}
-                <div className="flex-1 min-w-0">
-                  <div className="text-white text-xs font-medium truncate">{node.name}</div>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <span className="text-white/40 text-[10px] font-mono">{node.id}</span>
-                    {node.voltageLevel && (
-                      <span className="text-[#00d4ff]/60 text-[10px]">{node.voltageLevel}</span>
-                    )}
-                  </div>
+                <div className="space-y-1.5">
+                  {group.nodes.map((node) => (
+                    <button
+                      key={node.id}
+                      type="button"
+                      onClick={() => onNodeSelect?.(node)}
+                      className={`w-full rounded-xl border px-3 py-2.5 text-left transition-colors ${
+                        selectedNodeId === node.id
+                          ? 'border-cyan-300/35 bg-cyan-300/10'
+                          : 'border-white/6 bg-white/[0.03] hover:bg-white/[0.06]'
+                      }`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="mt-0.5 flex h-8 w-8 items-center justify-center rounded-xl bg-white/[0.06] text-slate-200">
+                          <Zap size={14} />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate text-sm font-medium text-white">{node.name}</div>
+                          <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                            <span className={`rounded-full border px-2 py-0.5 text-[10px] ${getStatusTone(node.status)}`}>
+                              {node.status === 'fault' ? '故障' : node.status === 'warning' ? '告警' : '正常'}
+                            </span>
+                            <span className="rounded-full border border-white/8 px-2 py-0.5 text-[10px] text-slate-400">
+                              {getNodeLabel(node)}
+                            </span>
+                            {node.voltageLevel && (
+                              <span className="rounded-full border border-white/8 px-2 py-0.5 text-[10px] text-slate-300">
+                                {node.voltageLevel}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </button>
+                  ))}
                 </div>
-
-                {/* 状态 */}
-                <div className="flex flex-col items-end gap-1">
-                  <div className={`
-                    w-2 h-2 rounded-full
-                    ${node.status === 'normal' ? 'bg-emerald-400' : ''}
-                    ${node.status === 'warning' ? 'bg-amber-400 animate-pulse' : ''}
-                    ${node.status === 'fault' ? 'bg-red-500 animate-pulse' : ''}
-                  `} />
-                  {node.status !== 'fault' && (
-                    <span className="text-[#00d4ff]/60 text-[10px]">
-                      {stableTemperatures[node.id]}°
-                    </span>
-                  )}
-                </div>
-              </button>
+              </div>
             ))}
-          </div>
-
-          {/* 底部图例 */}
-          <div className="px-4 py-3 border-t border-[#00d4ff]/20 bg-[#0a0f1a]/50">
-            <div className="grid grid-cols-2 gap-2 text-[10px]">
-              <div className="flex items-center gap-1.5">
-                <div className="w-2 h-2 rounded bg-blue-500" />
-                <span className="text-white/50">变电站</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <div className="w-2 h-2 rounded-full bg-slate-400" />
-                <span className="text-white/50">接头井</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <div className="w-2 h-2 rounded bg-emerald-500" />
-                <span className="text-white/50">用户站</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <div className="w-2 h-2 rounded bg-amber-500" />
-                <span className="text-white/50">接地箱</span>
-              </div>
-            </div>
           </div>
         </div>
       </div>
-
-      <style>{`
-        .custom-scrollbar::-webkit-scrollbar {
-          width: 4px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-track {
-          background: transparent;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-          background: rgba(0, 212, 255, 0.3);
-          border-radius: 2px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-          background: rgba(0, 212, 255, 0.5);
-        }
-      `}</style>
     </>
   );
 };

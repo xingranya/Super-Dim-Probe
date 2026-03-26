@@ -1,14 +1,10 @@
 import type { CablePath, SensorNode, MapNode, SubstationNode, JointNode } from '@/types/map';
+import { seededRange } from '@/utils/mockMetrics';
 
 // 基础坐标 - 荆州区域
 const BASE_COORDS = {
   center: [112.192641, 30.337027] as [number, number],
 };
-
-// 生成随机偏移 (模拟真实位置偏差)
-function randomOffset(range: number = 1): number {
-  return (Math.random() - 0.5) * 2 * range;
-}
 
 // 生成带偏移的坐标
 function offsetCoord(
@@ -30,6 +26,7 @@ const CORE_SUBSTATIONS: SubstationNode[] = [
     voltageLevel: '220kV',
     status: 'normal',
     capacity: '3×180MVA',
+    renderPriority: 'primary',
   },
   {
     id: 'sub-north',
@@ -38,6 +35,7 @@ const CORE_SUBSTATIONS: SubstationNode[] = [
     voltageLevel: '110kV',
     status: 'normal',
     capacity: '2×63MVA',
+    renderPriority: 'primary',
   },
   {
     id: 'sub-east',
@@ -46,6 +44,7 @@ const CORE_SUBSTATIONS: SubstationNode[] = [
     voltageLevel: '110kV',
     status: 'normal',
     capacity: '2×50MVA',
+    renderPriority: 'primary',
   },
   {
     id: 'sub-south',
@@ -54,6 +53,7 @@ const CORE_SUBSTATIONS: SubstationNode[] = [
     voltageLevel: '110kV',
     status: 'warning',
     capacity: '2×63MVA',
+    renderPriority: 'primary',
   },
   {
     id: 'sub-west',
@@ -62,61 +62,36 @@ const CORE_SUBSTATIONS: SubstationNode[] = [
     voltageLevel: '110kV',
     status: 'normal',
     capacity: '2×50MVA',
+    renderPriority: 'primary',
   },
 ];
 
-// 15个环网接头 - 分布在变电站之间形成网状
+// 8个核心环网接头 - 保留主环与关键联络点
 const RING_JOINTS: JointNode[] = [
-  // 北部环网
   { id: 'j-n1', name: '#N1 环网柜', position: offsetCoord(BASE_COORDS.center, -0.004, 0.006), status: 'normal', hasGrounding: true },
-  { id: 'j-n2', name: '#N2 环网柜', position: offsetCoord(BASE_COORDS.center, -0.006, 0.008), status: 'normal', hasGrounding: false },
-
-  // 东部环网
-  { id: 'j-e1', name: '#E1 环网柜', position: offsetCoord(BASE_COORDS.center, 0.006, 0.005), status: 'normal', hasGrounding: true },
-  { id: 'j-e2', name: '#E2 环网柜', position: offsetCoord(BASE_COORDS.center, 0.009, 0.003), status: 'normal', hasGrounding: true },
-  { id: 'j-e3', name: '#E3 环网柜', position: offsetCoord(BASE_COORDS.center, 0.010, -0.001), status: 'warning', hasGrounding: false },
-
-  // 南部环网
-  { id: 'j-s1', name: '#S1 环网柜', position: offsetCoord(BASE_COORDS.center, 0.008, -0.006), status: 'normal', hasGrounding: true },
-  { id: 'j-s2', name: '#S2 环网柜', position: offsetCoord(BASE_COORDS.center, 0.003, -0.009), status: 'warning', hasGrounding: true },
-  { id: 'j-s3', name: '#S3 环网柜', position: offsetCoord(BASE_COORDS.center, -0.002, -0.010), status: 'normal', hasGrounding: false },
-
-  // 西部环网
-  { id: 'j-w1', name: '#W1 环网柜', position: offsetCoord(BASE_COORDS.center, -0.006, -0.002), status: 'normal', hasGrounding: true },
-  { id: 'j-w2', name: '#W2 环网柜', position: offsetCoord(BASE_COORDS.center, -0.008, 0.002), status: 'normal', hasGrounding: true },
-
-  // 中心区域
-  { id: 'j-c1', name: '#C1 中心环网柜', position: offsetCoord(BASE_COORDS.center, -0.002, 0.003), status: 'normal', hasGrounding: true },
-  { id: 'j-c2', name: '#C2 中心环网柜', position: offsetCoord(BASE_COORDS.center, 0.003, 0.002), status: 'normal', hasGrounding: false },
-  { id: 'j-c3', name: '#C3 中心环网柜', position: offsetCoord(BASE_COORDS.center, 0.002, -0.002), status: 'normal', hasGrounding: true },
-
-  // 联络线接头
-  { id: 'j-l1', name: '#L1 联络柜', position: offsetCoord(BASE_COORDS.center, -0.001, 0.007), status: 'normal', hasGrounding: false },
-  { id: 'j-l2', name: '#L2 联络柜', position: offsetCoord(BASE_COORDS.center, 0.007, -0.004), status: 'normal', hasGrounding: true },
+  { id: 'j-ne1', name: '#NE1 环网柜', position: offsetCoord(BASE_COORDS.center, 0.005, 0.006), status: 'normal', hasGrounding: false },
+  { id: 'j-e1', name: '#E1 环网柜', position: offsetCoord(BASE_COORDS.center, 0.009, 0.002), status: 'normal', hasGrounding: true },
+  { id: 'j-s1', name: '#S1 环网柜', position: offsetCoord(BASE_COORDS.center, 0.007, -0.007), status: 'warning', hasGrounding: true },
+  { id: 'j-s2', name: '#S2 环网柜', position: offsetCoord(BASE_COORDS.center, 0.002, -0.011), status: 'fault', hasGrounding: true },
+  { id: 'j-sw1', name: '#SW1 环网柜', position: offsetCoord(BASE_COORDS.center, -0.006, -0.008), status: 'normal', hasGrounding: false },
+  { id: 'j-w1', name: '#W1 环网柜', position: offsetCoord(BASE_COORDS.center, -0.009, -0.002), status: 'normal', hasGrounding: true },
+  { id: 'j-c1', name: '#C1 中心环网柜', position: offsetCoord(BASE_COORDS.center, -0.001, 0.001), status: 'normal', hasGrounding: true },
 ];
 
-// 8个分支接头 - 连接到用户站
+// 4个分支接头 - 仅保留主要出线
 const BRANCH_JOINTS: JointNode[] = [
-  { id: 'j-b1', name: '#B1 分支箱', position: offsetCoord(BASE_COORDS.center, 0.004, 0.007), status: 'normal', hasGrounding: true },
-  { id: 'j-b2', name: '#B2 分支箱', position: offsetCoord(BASE_COORDS.center, 0.011, 0.005), status: 'normal', hasGrounding: false },
-  { id: 'j-b3', name: '#B3 分支箱', position: offsetCoord(BASE_COORDS.center, 0.010, -0.006), status: 'normal', hasGrounding: true },
-  { id: 'j-b4', name: '#B4 分支箱', position: offsetCoord(BASE_COORDS.center, 0.001, -0.011), status: 'normal', hasGrounding: false },
-  { id: 'j-b5', name: '#B5 分支箱', position: offsetCoord(BASE_COORDS.center, -0.007, -0.006), status: 'normal', hasGrounding: true },
-  { id: 'j-b6', name: '#B6 分支箱', position: offsetCoord(BASE_COORDS.center, -0.011, 0.001), status: 'warning', hasGrounding: false },
-  { id: 'j-b7', name: '#B7 分支箱', position: offsetCoord(BASE_COORDS.center, -0.005, 0.009), status: 'normal', hasGrounding: true },
-  { id: 'j-b8', name: '#B8 分支箱', position: offsetCoord(BASE_COORDS.center, 0.006, -0.008), status: 'normal', hasGrounding: false },
+  { id: 'j-b1', name: '#B1 分支箱', position: offsetCoord(BASE_COORDS.center, 0.004, 0.008), status: 'normal', hasGrounding: true },
+  { id: 'j-b2', name: '#B2 分支箱', position: offsetCoord(BASE_COORDS.center, 0.011, 0.004), status: 'normal', hasGrounding: false },
+  { id: 'j-b3', name: '#B3 分支箱', position: offsetCoord(BASE_COORDS.center, -0.006, -0.007), status: 'warning', hasGrounding: true },
+  { id: 'j-b4', name: '#B4 分支箱', position: offsetCoord(BASE_COORDS.center, -0.009, 0.005), status: 'normal', hasGrounding: false },
 ];
 
-// 8个用户站
+// 4个用户站 - 保留城市关键负荷点
 const USER_STATIONS: MapNode[] = [
-  { id: 'usr-1', name: '高新科技产业园', position: offsetCoord(BASE_COORDS.center, 0.013, 0.007), status: 'normal', nodeType: 'user_station' },
-  { id: 'usr-2', name: '经济技术开发区', position: offsetCoord(BASE_COORDS.center, 0.014, -0.002), status: 'normal', nodeType: 'user_station' },
-  { id: 'usr-3', name: '南部工业园', position: offsetCoord(BASE_COORDS.center, 0.007, -0.013), status: 'normal', nodeType: 'user_station' },
-  { id: 'usr-4', name: '滨湖商业中心', position: offsetCoord(BASE_COORDS.center, -0.003, -0.013), status: 'normal', nodeType: 'user_station' },
-  { id: 'usr-5', name: '西部住宅新区', position: offsetCoord(BASE_COORDS.center, -0.013, -0.005), status: 'normal', nodeType: 'user_station' },
-  { id: 'usr-6', name: '北部物流园', position: offsetCoord(BASE_COORDS.center, -0.012, 0.007), status: 'normal', nodeType: 'user_station' },
-  { id: 'usr-7', name: '中部CBD商圈', position: offsetCoord(BASE_COORDS.center, 0.004, 0.004), status: 'warning', nodeType: 'user_station' },
-  { id: 'usr-8', name: '东部创新基地', position: offsetCoord(BASE_COORDS.center, 0.012, 0.006), status: 'normal', nodeType: 'user_station' },
+  { id: 'usr-1', name: '高新科技产业园', position: offsetCoord(BASE_COORDS.center, 0.013, 0.007), status: 'normal', nodeType: 'user_station', renderPriority: 'secondary' },
+  { id: 'usr-2', name: '经济技术开发区', position: offsetCoord(BASE_COORDS.center, 0.014, -0.002), status: 'normal', nodeType: 'user_station', renderPriority: 'secondary' },
+  { id: 'usr-3', name: '南部工业园', position: offsetCoord(BASE_COORDS.center, 0.007, -0.013), status: 'warning', nodeType: 'user_station', renderPriority: 'secondary' },
+  { id: 'usr-4', name: '北部物流园', position: offsetCoord(BASE_COORDS.center, -0.012, 0.007), status: 'normal', nodeType: 'user_station', renderPriority: 'secondary' },
 ];
 
 // ============ 网状电缆拓扑 ============
@@ -128,26 +103,21 @@ export function generateMeshCablePaths(): CablePath[] {
     id: 'cable-main-ring',
     name: '110kV 主环网',
     voltageLevel: '110kV',
+    renderPriority: 'primary',
     coordinates: [
       CORE_SUBSTATIONS[0].position,  // 中心站
-      RING_JOINTS[10].position,       // C1
+      RING_JOINTS[7].position,        // C1
       RING_JOINTS[0].position,        // N1
       CORE_SUBSTATIONS[1].position,   // 北郊站
-      RING_JOINTS[1].position,        // N2
-      RING_JOINTS[13].position,       // L1
-      RING_JOINTS[11].position,       // C2
+      RING_JOINTS[1].position,        // NE1
       CORE_SUBSTATIONS[2].position,   // 东开发区站
       RING_JOINTS[2].position,        // E1
-      RING_JOINTS[3].position,        // E2
-      RING_JOINTS[14].position,       // L2
-      RING_JOINTS[6].position,        // S1
+      RING_JOINTS[3].position,        // S1
       CORE_SUBSTATIONS[3].position,   // 南部工业园站
-      RING_JOINTS[7].position,         // S2
-      RING_JOINTS[8].position,         // S3
-      RING_JOINTS[4].position,         // W1
+      RING_JOINTS[4].position,        // S2
+      RING_JOINTS[5].position,        // SW1
       CORE_SUBSTATIONS[4].position,   // 西部新城站
-      RING_JOINTS[9].position,         // W2
-      RING_JOINTS[5].position,         // C3
+      RING_JOINTS[6].position,        // W1
       CORE_SUBSTATIONS[0].position,   // 回到中心站
     ],
   });
@@ -157,22 +127,12 @@ export function generateMeshCablePaths(): CablePath[] {
     id: 'cable-east-radial',
     name: '东区配电网',
     voltageLevel: '35kV',
+    renderPriority: 'secondary',
     coordinates: [
       CORE_SUBSTATIONS[2].position,  // 东开发区站
       RING_JOINTS[2].position,        // E1
-      BRANCH_JOINTS[0].position,       // B1
+      BRANCH_JOINTS[0].position,      // B1
       USER_STATIONS[0].position,      // 高新科技产业园
-    ],
-  });
-
-  cables.push({
-    id: 'cable-east-branch2',
-    name: '东区二线',
-    voltageLevel: '35kV',
-    coordinates: [
-      RING_JOINTS[3].position,        // E2
-      BRANCH_JOINTS[1].position,       // B2
-      USER_STATIONS[1].position,       // 经济技术开发区
     ],
   });
 
@@ -181,21 +141,24 @@ export function generateMeshCablePaths(): CablePath[] {
     id: 'cable-south-radial',
     name: '南区配电网',
     voltageLevel: '35kV',
+    renderPriority: 'secondary',
     coordinates: [
       CORE_SUBSTATIONS[3].position,   // 南部工业园站
-      RING_JOINTS[6].position,        // S1
-      BRANCH_JOINTS[2].position,       // B3
+      RING_JOINTS[3].position,        // S1
+      BRANCH_JOINTS[2].position,      // B3
       USER_STATIONS[2].position,       // 南部工业园
     ],
   });
 
   cables.push({
-    id: 'cable-south-branch2',
-    name: '南区二线',
+    id: 'cable-east-branch2',
+    name: '东区二线',
     voltageLevel: '35kV',
+    renderPriority: 'secondary',
     coordinates: [
-      RING_JOINTS[7].position,        // S2
-      USER_STATIONS[6].position,       // 中部CBD商圈
+      CORE_SUBSTATIONS[2].position,
+      BRANCH_JOINTS[1].position,
+      USER_STATIONS[1].position,
     ],
   });
 
@@ -204,11 +167,12 @@ export function generateMeshCablePaths(): CablePath[] {
     id: 'cable-west-radial',
     name: '西区配电网',
     voltageLevel: '35kV',
+    renderPriority: 'secondary',
     coordinates: [
       CORE_SUBSTATIONS[4].position,   // 西部新城站
-      RING_JOINTS[4].position,        // W1
-      BRANCH_JOINTS[4].position,       // B5
-      USER_STATIONS[4].position,       // 西部住宅新区
+      RING_JOINTS[6].position,        // W1
+      BRANCH_JOINTS[3].position,
+      USER_STATIONS[3].position,
     ],
   });
 
@@ -217,36 +181,38 @@ export function generateMeshCablePaths(): CablePath[] {
     id: 'cable-north-radial',
     name: '北区配电网',
     voltageLevel: '35kV',
+    renderPriority: 'secondary',
     coordinates: [
       CORE_SUBSTATIONS[1].position,   // 北郊站
       RING_JOINTS[0].position,        // N1
-      BRANCH_JOINTS[6].position,       // B7
-      USER_STATIONS[5].position,       // 北部物流园
+      BRANCH_JOINTS[0].position,
+      USER_STATIONS[0].position,
     ],
   });
 
-  // 6. 中心互联线 - 形成网状
+  // 6. 中心互联线 - 少量骨干补强
   cables.push({
     id: 'cable-center-mesh1',
     name: '中心互联一线',
     voltageLevel: '110kV',
+    renderPriority: 'primary',
     coordinates: [
       CORE_SUBSTATIONS[0].position,  // 中心站
-      RING_JOINTS[12].position,       // C1
-      RING_JOINTS[11].position,       // C2
+      RING_JOINTS[7].position,       // C1
+      RING_JOINTS[2].position,
       CORE_SUBSTATIONS[0].position,   // 回到中心站
     ],
   });
 
   cables.push({
-    id: 'cable-center-mesh2',
-    name: '中心互联二线',
+    id: 'cable-south-tie',
+    name: '南部联络线',
     voltageLevel: '110kV',
+    renderPriority: 'secondary',
     coordinates: [
-      CORE_SUBSTATIONS[0].position,  // 中心站
-      RING_JOINTS[12].position,       // C3
-      RING_JOINTS[10].position,       // C1
-      CORE_SUBSTATIONS[0].position,   // 回到中心站
+      CORE_SUBSTATIONS[0].position,
+      RING_JOINTS[3].position,
+      CORE_SUBSTATIONS[3].position,
     ],
   });
 
@@ -255,6 +221,7 @@ export function generateMeshCablePaths(): CablePath[] {
     id: 'cable-220kv-in',
     name: '220kV 电源进线',
     voltageLevel: '110kV',
+    renderPriority: 'primary',
     coordinates: [
       CORE_SUBSTATIONS[0].position,
       CORE_SUBSTATIONS[1].position,
@@ -265,138 +232,35 @@ export function generateMeshCablePaths(): CablePath[] {
   cables.push({
     id: 'cable-east-tie',
     name: '东区联络线',
-    voltageLevel: '110kV',
-    coordinates: [
-      RING_JOINTS[4].position,        // E3
-      RING_JOINTS[14].position,       // L2
-      RING_JOINTS[6].position,        // S1
-    ],
-  });
-
-  // ============ 新增密集网状联络线 ============
-
-  // 9. 变电站间直连线 (形成核心骨干)
-  cables.push({
-    id: 'cable-direct-ce',
-    name: '中心-东区直连线',
-    voltageLevel: '110kV',
-    coordinates: [CORE_SUBSTATIONS[0].position, CORE_SUBSTATIONS[2].position],
-  });
-
-  cables.push({
-    id: 'cable-direct-cs',
-    name: '中心-南区直连线',
-    voltageLevel: '110kV',
-    coordinates: [CORE_SUBSTATIONS[0].position, CORE_SUBSTATIONS[3].position],
-  });
-
-  cables.push({
-    id: 'cable-direct-cw',
-    name: '中心-西区直连线',
-    voltageLevel: '110kV',
-    coordinates: [CORE_SUBSTATIONS[0].position, CORE_SUBSTATIONS[4].position],
-  });
-
-  // 10. 横向联络线 (东-南)
-  cables.push({
-    id: 'cable-tie-es',
-    name: '东南联络线',
     voltageLevel: '35kV',
+    renderPriority: 'secondary',
     coordinates: [
-      RING_JOINTS[3].position,  // E2
-      BRANCH_JOINTS[2].position, // B3
-      RING_JOINTS[5].position,  // S1
+      RING_JOINTS[2].position,
+      RING_JOINTS[7].position,
+      RING_JOINTS[3].position,
     ],
   });
 
-  // 11. 横向联络线 (南-西)
+  // 9. 少量 10kV 末端线
   cables.push({
-    id: 'cable-tie-sw',
-    name: '南西联络线',
-    voltageLevel: '35kV',
-    coordinates: [
-      RING_JOINTS[7].position,   // S2
-      BRANCH_JOINTS[4].position, // B5
-    ],
-  });
-
-  // 12. 对角联络线 (北-东)
-  cables.push({
-    id: 'cable-tie-ne',
-    name: '北东联络线',
-    voltageLevel: '35kV',
-    coordinates: [
-      RING_JOINTS[0].position,   // N1
-      RING_JOINTS[11].position,  // C2
-      RING_JOINTS[2].position,   // E1
-    ],
-  });
-
-  // 13. 用户站间 10kV 分支线
-  cables.push({
-    id: 'cable-10kv-u12',
+    id: 'cable-10kv-south',
     name: '用户站联络一线',
     voltageLevel: '10kV',
+    renderPriority: 'tertiary',
     coordinates: [
-      USER_STATIONS[0].position,   // 高新科技产业园
-      BRANCH_JOINTS[1].position,   // B2
-      USER_STATIONS[7].position,   // 东部创新基地
+      BRANCH_JOINTS[2].position,
+      USER_STATIONS[2].position,
     ],
   });
 
   cables.push({
-    id: 'cable-10kv-u34',
+    id: 'cable-10kv-north',
     name: '用户站联络二线',
     voltageLevel: '10kV',
+    renderPriority: 'tertiary',
     coordinates: [
-      USER_STATIONS[2].position,   // 南部工业园
-      BRANCH_JOINTS[7].position,   // B8
-      USER_STATIONS[3].position,   // 滨湖商业中心
-    ],
-  });
-
-  cables.push({
-    id: 'cable-10kv-u56',
-    name: '用户站联络三线',
-    voltageLevel: '10kV',
-    coordinates: [
-      USER_STATIONS[4].position,   // 西部住宅新区
-      BRANCH_JOINTS[5].position,   // B6
-      USER_STATIONS[5].position,   // 北部物流园
-    ],
-  });
-
-  // 14. B7-中心CBD联络
-  cables.push({
-    id: 'cable-10kv-b7cbd',
-    name: 'CBD联络线',
-    voltageLevel: '10kV',
-    coordinates: [
-      BRANCH_JOINTS[6].position,   // B7
-      USER_STATIONS[6].position,   // 中部CBD商圈
-    ],
-  });
-
-  // 15. 南部二号联络线
-  cables.push({
-    id: 'cable-south-tie2',
-    name: '南部联络二线',
-    voltageLevel: '35kV',
-    coordinates: [
-      RING_JOINTS[8].position,   // S3
-      BRANCH_JOINTS[3].position, // B4
-      USER_STATIONS[3].position, // 滨湖商业中心
-    ],
-  });
-
-  // 16. 西北联络线
-  cables.push({
-    id: 'cable-tie-wn',
-    name: '西北联络线',
-    voltageLevel: '35kV',
-    coordinates: [
-      RING_JOINTS[9].position,   // W2
-      RING_JOINTS[1].position,   // N2
+      BRANCH_JOINTS[3].position,
+      USER_STATIONS[3].position,
     ],
   });
 
@@ -416,6 +280,7 @@ export function generateMeshNodes(): MapNode[] {
       status: sub.status,
       nodeType: 'substation',
       voltageLevel: sub.voltageLevel,
+      renderPriority: 'primary',
     });
   });
 
@@ -428,6 +293,7 @@ export function generateMeshNodes(): MapNode[] {
       status: joint.status,
       nodeType: joint.hasGrounding ? 'grounding' : 'joint',
       hasGrounding: joint.hasGrounding,
+      renderPriority: joint.status !== 'normal' ? 'primary' : 'secondary',
     });
   });
 
@@ -440,6 +306,7 @@ export function generateMeshNodes(): MapNode[] {
       status: joint.status,
       nodeType: joint.hasGrounding ? 'grounding' : 'joint',
       hasGrounding: joint.hasGrounding,
+      renderPriority: joint.status !== 'normal' ? 'secondary' : 'tertiary',
     });
   });
 
@@ -451,6 +318,7 @@ export function generateMeshNodes(): MapNode[] {
       position: user.position,
       status: user.status,
       nodeType: 'user_station',
+      renderPriority: user.renderPriority || (user.status !== 'normal' ? 'secondary' : 'tertiary'),
     });
   });
 
@@ -467,16 +335,16 @@ export function generateMockMapData() {
     id: `sensor-${node.id}`,
     name: node.name,
     position: node.position,
-    status: node.status,
-    sensorType: 'integrated',
-    nodeType: node.nodeType,
-    readings: {
-      temp: 25 + Math.random() * 25,
-      pd: Math.random() * 50,
-      voltage: node.voltageLevel ? parseInt(node.voltageLevel) : 110,
-      current: 50 + Math.random() * 400,
-    },
-  }));
+      status: node.status,
+      sensorType: 'integrated',
+      nodeType: node.nodeType,
+      readings: {
+        temp: seededRange(`${node.id}-temp`, 25, 48, 1),
+        pd: seededRange(`${node.id}-pd`, 4, 48, 0),
+        voltage: node.voltageLevel ? parseInt(node.voltageLevel, 10) : 110,
+        current: seededRange(`${node.id}-current`, 80, 420, 0),
+      },
+    }));
 
   return {
     cables,
@@ -501,15 +369,15 @@ export function generateSensorNodes(): SensorNode[] {
   return nodes.map(node => ({
     id: node.id,
     name: node.name,
-    position: node.position,
-    status: node.status,
-    sensorType: 'integrated',
-    nodeType: node.nodeType,
-    readings: {
-      temp: 25 + Math.random() * 25,
-      pd: Math.random() * 50,
-    },
-  }));
+      position: node.position,
+      status: node.status,
+      sensorType: 'integrated',
+      nodeType: node.nodeType,
+      readings: {
+        temp: seededRange(`${node.id}-sensor-temp`, 25, 48, 1),
+        pd: seededRange(`${node.id}-sensor-pd`, 4, 48, 0),
+      },
+    }));
 }
 
 // 导出数据供外部使用

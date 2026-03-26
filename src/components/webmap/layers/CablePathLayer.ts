@@ -3,69 +3,80 @@ import type { CablePath } from '@/types/map';
 import { VOLTAGE_COLORS } from '@/types/map';
 import { hexToRgba, smoothEntirePath } from '../utils/geoUtils';
 
-/**
- * 电缆线宽配置 - 根据电压等级区分
- */
-const VOLTAGE_WIDTHS: Record<string, number> = {
-  '220kV': 6,
-  '110kV': 5,
-  '35kV': 3.5,
-  '10kV': 2.5,
+const LINE_STYLE: Record<string, { color: string; width: number; opacity: number; glow: number }> = {
+  '220kV': { color: '#6e8ab2', width: 4.2, opacity: 210, glow: 28 },
+  '110kV': { color: '#5c84b1', width: 3.4, opacity: 205, glow: 24 },
+  '35kV': { color: '#5f987e', width: 2.3, opacity: 178, glow: 16 },
+  '10kV': { color: '#ab8d5c', width: 1.5, opacity: 144, glow: 10 },
 };
 
-/**
- * 创建电缆路径渲染层 - 自然曲线 + 多层叠加效果
- * 底层发光 + 上层主体线，模拟真实电力线缆的视觉效果
- */
-export function createCablePathLayer(cables: CablePath[]) {
-  // 对所有电缆路径执行曲线平滑
-  const smoothedCables = cables.map(cable => ({
-    ...cable,
-    _smoothed: smoothEntirePath(cable.coordinates, 0.18, 8),
-  }));
+interface CableLayerOptions {
+  zoom: number;
+}
 
+const isCableVisible = (cable: CablePath, zoom: number) => {
+  const priority = cable.renderPriority || (
+    cable.voltageLevel === '110kV' ? 'primary' :
+    cable.voltageLevel === '35kV' ? 'secondary' :
+    'tertiary'
+  );
+
+  if (zoom < 14.2) return priority === 'primary';
+  if (zoom < 15.2) return priority !== 'tertiary';
+  return true;
+};
+
+export function createCablePathLayer(cables: CablePath[], options?: CableLayerOptions) {
+  const zoom = options?.zoom ?? 15;
+  const visibleCables = cables.filter((cable) => isCableVisible(cable, zoom));
+  const smoothedCables = visibleCables.map(cable => ({
+    ...cable,
+    _smoothed: smoothEntirePath(cable.coordinates, 0.12, 5),
+  }));
   const layers = [];
 
-  // 1. 底层 - 柔和发光线 (比主体线更宽、更透明)
   const glowLayer = new PathLayer<typeof smoothedCables[0]>({
     id: 'cable-glow',
     data: smoothedCables,
     getPath: d => d._smoothed,
     getColor: d => {
-      const hex = d.color || VOLTAGE_COLORS[d.voltageLevel] || '#3b82f6';
-      return hexToRgba(hex, 40);
+      const style = LINE_STYLE[d.voltageLevel] || LINE_STYLE['110kV'];
+      const hex = d.color || style.color || VOLTAGE_COLORS[d.voltageLevel] || '#5c84b1';
+      return hexToRgba(hex, style.glow);
     },
-    getWidth: d => (VOLTAGE_WIDTHS[d.voltageLevel] || 4) * 2.5,
-    widthMinPixels: 4,
-    widthMaxPixels: 20,
+    getWidth: d => (LINE_STYLE[d.voltageLevel] || LINE_STYLE['110kV']).width * 1.6,
+    widthMinPixels: 1,
+    widthMaxPixels: 12,
     jointRounded: true,
     capRounded: true,
     pickable: false,
     billboard: false,
     updateTriggers: {
-      getColor: [smoothedCables.map(c => c.color || c.voltageLevel).join(',')],
+      getColor: [smoothedCables.map(c => `${c.id}-${c.color || c.voltageLevel}`).join(',')],
     },
   });
   layers.push(glowLayer);
 
-  // 2. 主体线 - 实线 (清晰可见的主体路径)
   const mainLayer = new PathLayer<typeof smoothedCables[0]>({
     id: 'cable-main',
     data: smoothedCables,
     getPath: d => d._smoothed,
     getColor: d => {
-      const hex = d.color || VOLTAGE_COLORS[d.voltageLevel] || '#3b82f6';
-      return hexToRgba(hex, 200);
+      const style = LINE_STYLE[d.voltageLevel] || LINE_STYLE['110kV'];
+      const hex = d.color || style.color || VOLTAGE_COLORS[d.voltageLevel] || '#5c84b1';
+      return hexToRgba(hex, style.opacity);
     },
-    getWidth: d => VOLTAGE_WIDTHS[d.voltageLevel] || 4,
-    widthMinPixels: 2,
-    widthMaxPixels: 8,
+    getWidth: d => (LINE_STYLE[d.voltageLevel] || LINE_STYLE['110kV']).width,
+    widthMinPixels: 1,
+    widthMaxPixels: 6,
     jointRounded: true,
     capRounded: true,
     pickable: true,
+    autoHighlight: true,
+    highlightColor: [255, 255, 255, 96],
     billboard: false,
     updateTriggers: {
-      getColor: [smoothedCables.map(c => c.color || c.voltageLevel).join(',')],
+      getColor: [smoothedCables.map(c => `${c.id}-${c.color || c.voltageLevel}`).join(',')],
     },
   });
   layers.push(mainLayer);

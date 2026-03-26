@@ -6,6 +6,7 @@ export interface CablePath {
   coordinates: [number, number][]; // [lng, lat] 经纬度数组
   width?: number;                  // 渲染宽度
   color?: string;                  // 覆盖默认颜色
+  renderPriority?: 'primary' | 'secondary' | 'tertiary';
 }
 
 // 节点类型枚举
@@ -35,6 +36,7 @@ export interface SubstationNode {
   voltageLevel: '220kV' | '110kV';
   status: 'normal' | 'warning' | 'fault';
   capacity?: string; // 容量
+  renderPriority?: 'primary' | 'secondary' | 'tertiary';
 }
 
 // 接头节点
@@ -44,6 +46,7 @@ export interface JointNode {
   position: [number, number];
   status: 'normal' | 'warning' | 'fault';
   hasGrounding?: boolean; // 是否有接地箱
+  renderPriority?: 'primary' | 'secondary' | 'tertiary';
 }
 
 // 统一节点接口 (用于渲染层)
@@ -53,6 +56,7 @@ export interface MapNode {
   position: [number, number];
   status: 'normal' | 'warning' | 'fault';
   nodeType: NodeType;
+  renderPriority?: 'primary' | 'secondary' | 'tertiary';
   // 可选属性
   voltageLevel?: string;
   sensorType?: string;

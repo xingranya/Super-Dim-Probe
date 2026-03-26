@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useMemo, useRef } from 'react';
 import Map, { MapRef } from 'react-map-gl';
 import { DeckGL } from '@deck.gl/react';
-import type { MapViewState, CablePath, SensorNode, MapNode } from '@/types/map';
+import type { CablePath, SensorNode, MapNode, MapViewState } from '@/types/map';
 import { createCablePathLayer } from './layers/CablePathLayer';
 import { createSensorScatterLayer } from './layers/SensorScatterLayer';
 import { createRealisticNodeLayer, createPulseAnimationLayer } from './layers/NodeIconLayer';
@@ -12,24 +12,24 @@ import { generateMockMapData } from './utils/mockData';
 export interface CableMapViewerProps {
   cables?: CablePath[];
   sensors?: SensorNode[];
-  nodes?: MapNode[];        // 统一节点数据
+  nodes?: MapNode[];
   mapboxToken: string;
   initialViewState?: Partial<MapViewState>;
   onSensorClick?: (sensor: SensorNode) => void;
   onNodeClick?: (node: MapNode) => void;
-  onViewDetails?: (node: MapNode) => void;  // 查看详情回调
-  onViewHistory?: (node: MapNode) => void;  // 查看历史回调
+  onViewDetails?: (node: MapNode) => void;
+  onViewHistory?: (node: MapNode) => void;
   className?: string;
-  showHUD?: boolean;        // 是否显示HUD
-  showPulseEffect?: boolean; // 是否显示脉冲动画
+  showHUD?: boolean;
+  showPulseEffect?: boolean;
 }
 
 const DEFAULT_VIEW_STATE: MapViewState = {
   longitude: 112.192641,
   latitude: 30.337027,
-  zoom: 15,
-  pitch: 0,     // 恢复垂直俯视视角
-  bearing: 0,   // 恢复正北朝上
+  zoom: 14.75,
+  pitch: 18,
+  bearing: -12,
 };
 
 const CableMapViewer: React.FC<CableMapViewerProps> = ({
@@ -52,20 +52,15 @@ const CableMapViewer: React.FC<CableMapViewerProps> = ({
     ...DEFAULT_VIEW_STATE,
     ...initialViewState,
   });
+  const [selectedNode, setSelectedNode] = useState<MapNode | null>(null);
+  const [tooltipPosition, setTooltipPosition] = useState<{ x: number; y: number } | undefined>(undefined);
 
-  // 生成模拟数据
+  const mapRef = useRef<MapRef>(null);
   const mockData = useMemo(() => generateMockMapData(), []);
 
-  // 使用传入数据或模拟数据
   const cables = propCables || mockData.cables;
   const sensors = propSensors || mockData.sensors;
   const nodes = propNodes || mockData.nodes;
-
-  // 选中的节点
-  const [selectedNode, setSelectedNode] = useState<MapNode | null>(null);
-  const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
-
-  const mapRef = useRef<MapRef>(null);
 
   const handleMapLoad = useCallback(() => {
     setMapLoaded(true);
@@ -80,91 +75,49 @@ const CableMapViewer: React.FC<CableMapViewerProps> = ({
     setViewState(nextViewState);
   }, []);
 
+  const handleNodeClick = useCallback((node: MapNode, context?: { x?: number; y?: number }) => {
+    setSelectedNode((current) => current?.id === node.id ? null : node);
+    if (context?.x !== undefined && context?.y !== undefined) {
+      setTooltipPosition({ x: context.x, y: context.y });
+    }
+    onNodeClick?.(node);
+  }, [onNodeClick]);
+
   const handleSensorClick = useCallback((sensor: SensorNode) => {
     onSensorClick?.(sensor);
   }, [onSensorClick]);
 
-  const handleNodeClick = useCallback((node: MapNode) => {
-    setSelectedNode(node);
-    // 将tooltip显示在屏幕中心偏右位置
-    setTooltipPosition({ x: window.innerWidth * 0.65, y: window.innerHeight / 2 });
-    onNodeClick?.(node);
-  }, [onNodeClick]);
-
-  const getTooltip = useCallback((info: { object?: any }): string | null => {
-    if (!info.object) return null;
-
-    const obj = info.object;
-
-    // MapNode
-    if (obj.nodeType) {
-      const node = obj as MapNode;
-      return `${node.name}\n状态: ${node.status}\n类型: ${node.nodeType}`;
-    }
-
-    // SensorNode
-    if (obj.sensorType) {
-      const sensor = obj as SensorNode;
-      const readings = sensor.readings;
-      let tooltip = `${sensor.name}\n状态: ${sensor.status}\n类型: ${sensor.sensorType}`;
-      if (readings) {
-        if (readings.pd !== undefined) tooltip += `\n局部放电: ${readings.pd} pC`;
-        if (readings.temp !== undefined) tooltip += `\n温度: ${readings.temp} °C`;
-        if (readings.voltage !== undefined) tooltip += `\n电压: ${readings.voltage} kV`;
-        if (readings.current !== undefined) tooltip += `\n电流: ${readings.current} A`;
-      }
-      return tooltip;
-    }
-
-    // CablePath
-    if (obj.voltageLevel) {
-      const cable = obj as CablePath;
-      return `${cable.name}\n电压等级: ${cable.voltageLevel}`;
-    }
-
-    // Fallback
-    if (obj.id && obj.name) {
-      return `${obj.name} (${obj.id})`;
-    }
-
-    return null;
-  }, []);
-
   const layers = useMemo(() => {
     const allLayers = [];
+    allLayers.push(...createCablePathLayer(cables, { zoom: viewState.zoom }));
 
-    // 电缆路径层 (返回多层)
-    allLayers.push(...createCablePathLayer(cables));
+    if (nodes.length > 0) {
+      allLayers.push(...createRealisticNodeLayer(nodes, {
+        zoom: viewState.zoom,
+        selectedNodeId: selectedNode?.id,
+        onClick: handleNodeClick,
+      }));
 
-    // 如果有统一节点数据，使用新的真实感节点层
-    if (nodes && nodes.length > 0) {
-      // 真实感节点层 (多层叠加)
-      const nodeLayers = createRealisticNodeLayer(nodes, handleNodeClick);
-      allLayers.push(...nodeLayers);
-
-      // 脉冲动画层
       if (showPulseEffect) {
-        const pulseLayers = createPulseAnimationLayer(nodes);
-        allLayers.push(...pulseLayers);
+        allLayers.push(...createPulseAnimationLayer(
+          nodes.filter((node) => viewState.zoom >= 14.2 || node.status !== 'normal' || node.nodeType === 'substation')
+        ));
       }
-    } else if (sensors && sensors.length > 0) {
-      // 兼容旧的传感器散点层
+    } else if (sensors.length > 0) {
       allLayers.push(createSensorScatterLayer(sensors, handleSensorClick));
     }
 
     return allLayers;
-  }, [cables, sensors, nodes, handleSensorClick, handleNodeClick, showPulseEffect]);
+  }, [cables, handleNodeClick, handleSensorClick, nodes, selectedNode?.id, sensors, showPulseEffect, viewState.zoom]);
 
   if (!mapboxToken) {
     return (
       <div className="flex flex-col items-center justify-center h-full bg-[#0a0f1a] text-white font-sans">
-        <svg className="w-16 h-16 mb-4 text-[#00d4ff]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <svg className="w-16 h-16 mb-4 text-amber-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
         </svg>
         <h2 className="text-xl font-bold mb-2">地图加载失败</h2>
-        <p className="text-white/50 text-center max-w-md">
-          请在 .env.local 中配置 VITE_MAPBOX_TOKEN
-        </p>
+        <p className="text-white/50 text-center max-w-md">请在 `.env.local` 中配置 `VITE_MAPBOX_TOKEN`</p>
       </div>
     );
   }
@@ -183,49 +136,52 @@ const CableMapViewer: React.FC<CableMapViewerProps> = ({
   }
 
   return (
-    <div className={`relative w-full h-full ${className}`}>
+    <div className={`relative w-full h-full overflow-hidden ${className}`}>
       <Map
         ref={mapRef}
         mapboxAccessToken={mapboxToken}
-        mapStyle="mapbox://styles/mapbox/satellite-streets-v12"
+        mapStyle="mapbox://styles/mapbox/satellite-v9"
         {...viewState}
         onMove={(event) => handleViewStateChange(event.viewState as unknown as MapViewState)}
         onLoad={handleMapLoad}
         onError={handleMapError}
         attributionControl={false}
         style={{ width: '100%', height: '100%' }}
-      >
+      />
+
+      <div className="pointer-events-none absolute inset-0">
         <DeckGL
           viewState={viewState}
-          onViewStateChange={({ viewState: vs }) => handleViewStateChange(vs as unknown as MapViewState)}
+          onViewStateChange={({ viewState: nextState }) => handleViewStateChange(nextState as unknown as MapViewState)}
           controller={false}
           layers={layers}
-          getTooltip={getTooltip}
-          style={{ pointerEvents: 'none' }}
+          style={{ position: 'absolute', top: '0', right: '0', bottom: '0', left: '0', pointerEvents: 'none' }}
         />
-      </Map>
+      </div>
 
-      {/* HUD 悬浮监控面板 - 右侧 */}
+      <div className="pointer-events-none absolute inset-0">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_42%,rgba(7,13,23,0.06)_0%,rgba(7,13,23,0.24)_72%,rgba(3,7,18,0.42)_100%)]" />
+        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(3,10,18,0.18)_0%,rgba(3,10,18,0.02)_28%,rgba(3,10,18,0.10)_72%,rgba(3,10,18,0.22)_100%)]" />
+      </div>
+
       {showHUD && (
         <MapHUD
           nodes={nodes}
-          onNodeSelect={handleNodeClick}
+          onNodeSelect={(node) => handleNodeClick(node)}
           selectedNodeId={selectedNode?.id}
+          zoom={viewState.zoom}
         />
       )}
 
-      {/* 节点详情提示 - 右侧浮动 */}
       {selectedNode && (
         <NodeTooltip
           node={selectedNode}
           position={tooltipPosition}
           onClose={() => setSelectedNode(null)}
           onViewDetails={() => {
-            // 优先使用外部回调，否则通过 onSensorClick 跳转到 dashboard
             if (onViewDetails) {
               onViewDetails(selectedNode);
             } else if (onSensorClick) {
-              // 将 MapNode 转为 SensorNode 格式
               onSensorClick({
                 id: selectedNode.id,
                 name: selectedNode.name,
@@ -238,17 +194,15 @@ const CableMapViewer: React.FC<CableMapViewerProps> = ({
             }
             setSelectedNode(null);
           }}
-          onViewHistory={() => {
-            onViewHistory?.(selectedNode);
-          }}
+          onViewHistory={() => onViewHistory?.(selectedNode)}
         />
       )}
 
       {!mapLoaded && (
-        <div className="absolute inset-0 flex items-center justify-center bg-[#0a0f1a]/70 z-20">
-          <div className="text-center">
-            <div className="w-12 h-12 border-4 border-[#00d4ff]/30 border-t-[#00d4ff] rounded-full animate-spin mx-auto mb-4" />
-            <span className="text-white font-sans">地图加载中...</span>
+        <div className="absolute inset-0 flex items-center justify-center bg-[#07111b]/55 z-20">
+          <div className="rounded-2xl bg-[#0a0f1a]/86 border border-white/10 px-5 py-4 text-center backdrop-blur-md">
+            <div className="mx-auto mb-3 h-10 w-10 rounded-full border-2 border-cyan-300/20 border-t-cyan-300 animate-spin" />
+            <span className="text-sm text-white">地图加载中...</span>
           </div>
         </div>
       )}

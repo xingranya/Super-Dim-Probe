@@ -218,7 +218,7 @@ const VisualizationPage: React.FC = () => {
           cables={webmapData.cables}
           nodes={webmapData.nodes}
           mapboxToken={import.meta.env.VITE_MAPBOX_TOKEN || ''}
-          initialViewState={{ longitude: 112.192641, latitude: 30.337027, zoom: 15 }}
+          initialViewState={{ longitude: 112.192641, latitude: 30.337027, zoom: 14.75, pitch: 18, bearing: -12 }}
           onSensorClick={(sensor) => {
             setPreviousView('webmap');
             setSelectedSensorId(sensor.id);
