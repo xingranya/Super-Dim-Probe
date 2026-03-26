@@ -20,15 +20,17 @@ const SaaSPage = () => {
     <div className="bg-slate-50 py-16 min-h-screen">
       <div className="container mx-auto px-4">
         <div className="text-center max-w-3xl mx-auto mb-12">
-          <h2 className="text-base font-semibold text-brand-600 uppercase tracking-wider mb-2">灵活定价方案</h2>
-          <h1 className="text-4xl font-bold text-slate-900 mb-4">选择适合您车队/设备的订阅计划</h1>
-          <p className="text-slate-600 text-lg">从单点监测到全球基础设施管理，我们提供可扩展的工业物联网解决方案。</p>
+          <h2 className="app-heading-kicker text-base font-semibold text-brand-600 mb-2">灵活定价方案</h2>
+          <h1 className="app-display-title text-4xl font-bold text-slate-900 mb-4">选择适合您车队/设备的订阅计划</h1>
+          <p className="app-copy app-readable text-slate-600 text-lg mx-auto">从单点监测到全球基础设施管理，我们提供可扩展的工业物联网解决方案。</p>
           
           <div className="mt-8 flex justify-center items-center gap-4">
              <span className={`text-sm font-medium ${billingCycle === 'monthly' ? 'text-slate-800' : 'text-slate-500'}`}>按月付费</span>
              <button 
                onClick={() => setBillingCycle(billingCycle === 'yearly' ? 'monthly' : 'yearly')}
-               className="w-14 h-8 bg-brand-600 rounded-full relative transition-colors focus:outline-none"
+               type="button"
+               aria-label={billingCycle === 'yearly' ? '切换为按月付费' : '切换为按年付费'}
+               className="w-14 h-8 bg-brand-600 rounded-full relative transition-colors"
              >
                <div className={`absolute top-1 w-6 h-6 bg-white rounded-full transition-transform duration-200 shadow-md ${billingCycle === 'yearly' ? 'left-7' : 'left-1'}`}></div>
              </button>

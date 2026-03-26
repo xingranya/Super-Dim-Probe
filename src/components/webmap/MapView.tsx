@@ -71,13 +71,13 @@ const CableMapViewer: React.FC<CableMapViewerProps> = ({
     setMapLoaded(true);
   }, []);
 
-  const handleMapError = useCallback((error: Error) => {
-    console.error('Map error:', error);
+  const handleMapError = useCallback((event: { error: Error }) => {
+    console.error('Map error:', event.error);
     setMapError('地图服务连接失败，请检查网络或 Token 有效性');
   }, []);
 
-  const handleViewStateChange = useCallback(({ viewState: vs }: { viewState: MapViewState }) => {
-    setViewState(vs);
+  const handleViewStateChange = useCallback((nextViewState: MapViewState) => {
+    setViewState(nextViewState);
   }, []);
 
   const handleSensorClick = useCallback((sensor: SensorNode) => {
@@ -189,7 +189,7 @@ const CableMapViewer: React.FC<CableMapViewerProps> = ({
         mapboxAccessToken={mapboxToken}
         mapStyle="mapbox://styles/mapbox/satellite-streets-v12"
         {...viewState}
-        onMove={handleViewStateChange}
+        onMove={(event) => handleViewStateChange(event.viewState as unknown as MapViewState)}
         onLoad={handleMapLoad}
         onError={handleMapError}
         attributionControl={false}
@@ -197,7 +197,7 @@ const CableMapViewer: React.FC<CableMapViewerProps> = ({
       >
         <DeckGL
           viewState={viewState}
-          onViewStateChange={handleViewStateChange}
+          onViewStateChange={({ viewState: vs }) => handleViewStateChange(vs as unknown as MapViewState)}
           controller={false}
           layers={layers}
           getTooltip={getTooltip}

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Activity, AlertTriangle, CheckCircle, Zap, Thermometer, Signal, ChevronDown, ChevronUp } from 'lucide-react';
 import type { MapNode } from '@/types/map';
+import { seededRange } from '@/utils/mockMetrics';
 
 interface MapHUDProps {
   nodes: MapNode[];
@@ -43,6 +44,12 @@ const MapHUD: React.FC<MapHUDProps> = ({
   const filteredNodes = filter === 'all'
     ? nodes
     : nodes.filter(n => n.status === filter);
+
+  const stableTemperatures = React.useMemo(() => {
+    return Object.fromEntries(
+      filteredNodes.map((node) => [node.id, seededRange(`${node.id}-hud-temp`, 30, 50, 0)])
+    ) as Record<string, number>;
+  }, [filteredNodes]);
 
   return (
     <>
@@ -108,7 +115,10 @@ const MapHUD: React.FC<MapHUDProps> = ({
       <div className="absolute top-4 right-4 z-20">
         <button
           onClick={() => setPanelExpanded(!panelExpanded)}
-          className="bg-[#0a0f1a]/90 backdrop-blur-sm border border-[#00d4ff]/30 rounded-lg px-3 py-2 flex items-center gap-2 shadow-lg shadow-cyan-500/10 hover:bg-[#0a0f1a] transition-all"
+          type="button"
+          aria-label={panelExpanded ? '收起监测节点面板' : '展开监测节点面板'}
+          aria-expanded={panelExpanded}
+          className="bg-[#0a0f1a]/90 backdrop-blur-sm border border-[#00d4ff]/30 rounded-lg px-3 py-2 flex items-center gap-2 shadow-lg shadow-cyan-500/10 hover:bg-[#0a0f1a] transition-all app-focus-dark"
         >
           <Activity size={14} className="text-[#00d4ff]" />
           <span className="text-white text-xs font-medium">
@@ -175,7 +185,7 @@ const MapHUD: React.FC<MapHUDProps> = ({
                   `} />
                   {node.status !== 'fault' && (
                     <span className="text-[#00d4ff]/60 text-[10px]">
-                      {(30 + Math.random() * 20).toFixed(0)}°
+                      {stableTemperatures[node.id]}°
                     </span>
                   )}
                 </div>
@@ -215,11 +225,11 @@ const MapHUD: React.FC<MapHUDProps> = ({
           background: transparent;
         }
         .custom-scrollbar::-webkit-scrollbar-thumb {
-          background: #00d4ff/30;
+          background: rgba(0, 212, 255, 0.3);
           border-radius: 2px;
         }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-          background: #00d4ff/50;
+          background: rgba(0, 212, 255, 0.5);
         }
       `}</style>
     </>

@@ -31,14 +31,28 @@ const Footer = () => (
         <div>
           <h4 className="text-white font-semibold mb-4">关注我们</h4>
           <div className="flex space-x-4">
-            <a href="#" className="hover:text-brand-400" target="_blank" rel="noopener noreferrer"><Github size={20} /></a>
+            <button
+              type="button"
+              aria-label="GitHub 页面暂未配置"
+              title="GitHub 页面暂未配置"
+              className="app-icon-button rounded-lg hover:bg-slate-800 hover:text-brand-400"
+            >
+              <Github size={20} />
+            </button>
             {/* Add more social icons as needed */}
           </div>
           <div className="mt-4">
-            <p className="text-xs text-slate-500">订阅我们的最新动态</p>
+            <label htmlFor="footer-newsletter-email" className="text-xs text-slate-500">订阅我们的最新动态</label>
             <div className="flex mt-2">
-              <input type="email" placeholder="您的邮箱" className="bg-slate-800 text-white text-sm px-3 py-2 rounded-l focus:outline-none focus:ring-1 focus:ring-brand-500 w-full" />
-              <button className="bg-brand-600 px-3 py-2 rounded-r hover:bg-brand-700 text-white"><ChevronRight size={16} /></button>
+              <input
+                id="footer-newsletter-email"
+                type="email"
+                placeholder="您的邮箱"
+                className="bg-slate-800 text-white text-sm px-3 py-2 rounded-l w-full"
+              />
+              <button type="button" aria-label="提交邮箱订阅" className="app-icon-button bg-brand-600 px-3 py-2 rounded-r hover:bg-brand-700 text-white">
+                <ChevronRight size={16} />
+              </button>
             </div>
           </div>
         </div>

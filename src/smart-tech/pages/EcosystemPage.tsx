@@ -22,8 +22,9 @@ const EcosystemPage = () => {
   return (
     <div className="container mx-auto px-4 py-16">
       <div className="text-center mb-16">
-        <h1 className="text-4xl font-bold text-slate-800 mb-4">生态合作体系</h1>
-        <p className="text-slate-600 max-w-2xl mx-auto">
+        <p className="app-heading-kicker text-sm font-semibold text-brand-600 mb-4">Partner Network</p>
+        <h1 className="app-display-title text-4xl font-bold text-slate-800 mb-4">生态合作体系</h1>
+        <p className="app-copy app-readable text-slate-600 max-w-2xl mx-auto">
           与行业领袖共建互联未来。通过 API 集成共享收益，为开发者提供强大的技术平台。
         </p>
       </div>
@@ -51,6 +52,7 @@ const EcosystemPage = () => {
                 <img 
                   src={partner.logo} 
                   alt={`${partner.name} logo`}
+                  loading="lazy"
                   className="h-16 w-auto object-contain filter transition-all duration-300"
                   onError={(e) => {
                     e.currentTarget.style.display = 'none';

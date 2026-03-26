@@ -5,6 +5,7 @@ import { Menu, X, User } from 'lucide-react';
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const location = useLocation();
+  const mobileMenuId = 'smart-tech-mobile-menu';
 
   const navLinks = [
     { name: '智能硬件', path: '/smart-tech/products' },
@@ -55,7 +56,14 @@ const Navbar = () => {
 
           {/* Mobile menu button */}
           <div className="md:hidden flex items-center">
-            <button onClick={() => setIsOpen(!isOpen)} className="text-slate-600 hover:text-slate-900 focus:outline-none">
+            <button
+              type="button"
+              onClick={() => setIsOpen(!isOpen)}
+              aria-label={isOpen ? '关闭导航菜单' : '打开导航菜单'}
+              aria-expanded={isOpen}
+              aria-controls={mobileMenuId}
+              className="app-icon-button rounded-lg text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+            >
               {isOpen ? <X size={24} /> : <Menu size={24} />}
             </button>
           </div>
@@ -64,7 +72,7 @@ const Navbar = () => {
 
       {/* Mobile Menu */}
       {isOpen && (
-        <div className="md:hidden bg-white border-t border-gray-100 absolute w-full shadow-xl">
+        <div id={mobileMenuId} className="md:hidden bg-white border-t border-gray-100 absolute w-full shadow-xl">
           <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
             {navLinks.map((link) => (
               <Link

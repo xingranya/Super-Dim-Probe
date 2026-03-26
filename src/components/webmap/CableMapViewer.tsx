@@ -73,8 +73,8 @@ const CableMapViewer: React.FC<CableMapViewerProps> = ({
     setMapLoaded(true);
   }, []);
 
-  const handleMapError = useCallback((error: Error) => {
-    console.error('Map error:', error);
+  const handleMapError = useCallback((event: { error: Error }) => {
+    console.error('Map error:', event.error);
     setMapError('地图服务连接失败，请检查网络或 Token 有效性');
   }, []);
 

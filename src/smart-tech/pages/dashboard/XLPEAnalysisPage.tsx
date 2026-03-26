@@ -1,7 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import ReactECharts from 'echarts-for-react';
 import * as echarts from 'echarts';
 import { RefreshCw, Download, Filter } from 'lucide-react';
+import {
+  dashboardPrimaryButtonClass,
+  dashboardSecondaryButtonClass,
+} from './dashboardUi';
 
 const XLPEAnalysisPage: React.FC = () => {
   const [stateType, setStateType] = useState('normal');
@@ -340,18 +344,23 @@ const XLPEAnalysisPage: React.FC = () => {
     return () => clearInterval(timer);
   }, []);
 
+  const tfMapOption = useMemo(() => getTFMapOption(), [stateType, sensorId, tick]);
+  const prdrOption = useMemo(() => getPRDROption(), [defectType, sensorId, tick]);
+  const classificationOption = useMemo(() => getClassificationOption(), [defectType]);
+
   return (
     <div className="space-y-6">
       {/* 控制面板 */}
       <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-        <div className="flex flex-wrap gap-4 items-center justify-between">
-          <div className="flex flex-wrap gap-4">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-slate-500">电缆状态</label>
+              <label htmlFor="xlpe-state-type" className="text-xs font-medium text-slate-500">电缆状态</label>
               <select 
+                id="xlpe-state-type"
                 value={stateType}
                 onChange={(e) => setStateType(e.target.value)}
-                className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                className="min-h-11 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm"
               >
                 {Object.entries(stateTypeNames).map(([key, name]) => (
                   <option key={key} value={key}>{name}</option>
@@ -359,11 +368,12 @@ const XLPEAnalysisPage: React.FC = () => {
               </select>
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-slate-500">缺陷类型</label>
+              <label htmlFor="xlpe-defect-type" className="text-xs font-medium text-slate-500">缺陷类型</label>
               <select 
+                id="xlpe-defect-type"
                 value={defectType}
                 onChange={(e) => setDefectType(e.target.value)}
-                className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                className="min-h-11 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm"
               >
                 {Object.entries(defectTypeNames).map(([key, name]) => (
                   <option key={key} value={key}>{name}</option>
@@ -371,11 +381,12 @@ const XLPEAnalysisPage: React.FC = () => {
               </select>
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-slate-500">传感器编号</label>
+              <label htmlFor="xlpe-sensor-id" className="text-xs font-medium text-slate-500">传感器编号</label>
               <select 
+                id="xlpe-sensor-id"
                 value={sensorId}
                 onChange={(e) => setSensorId(e.target.value)}
-                className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                className="min-h-11 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm"
               >
                 {[1, 2, 3, 4].map(id => (
                   <option key={id} value={id}>五维公路传感器{id}</option>
@@ -383,11 +394,12 @@ const XLPEAnalysisPage: React.FC = () => {
               </select>
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-slate-500">电压等级</label>
+              <label htmlFor="xlpe-voltage-level" className="text-xs font-medium text-slate-500">电压等级</label>
               <select 
+                id="xlpe-voltage-level"
                 value={voltageLevel}
                 onChange={(e) => setVoltageLevel(e.target.value)}
-                className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                className="min-h-11 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm"
               >
                 {['10kV', '35kV', '110kV', '220kV'].map(v => (
                   <option key={v} value={v}>{v}</option>
@@ -396,10 +408,10 @@ const XLPEAnalysisPage: React.FC = () => {
             </div>
           </div>
           <div className="flex gap-2">
-            <button className="flex items-center gap-2 px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 transition-colors">
+            <button type="button" aria-label="更新 XLPE 状态分析" className={dashboardPrimaryButtonClass('bg-brand-600 hover:bg-brand-700')}>
               <RefreshCw size={16} /> 更新分析
             </button>
-            <button className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-slate-600 rounded-lg hover:bg-gray-50 transition-colors">
+            <button type="button" aria-label="导出 XLPE 分析数据" className={dashboardSecondaryButtonClass}>
               <Download size={16} /> 导出数据
             </button>
           </div>
@@ -409,16 +421,16 @@ const XLPEAnalysisPage: React.FC = () => {
       {/* 图表区域 */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 h-[400px]">
-          <ReactECharts option={getTFMapOption()} style={{ height: '100%', width: '100%' }} notMerge={false} />
+          <ReactECharts option={tfMapOption} style={{ height: '100%', width: '100%' }} notMerge={false} />
         </div>
         <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 h-[400px]">
-          <ReactECharts option={getPRDROption()} style={{ height: '100%', width: '100%' }} notMerge={false} />
+          <ReactECharts option={prdrOption} style={{ height: '100%', width: '100%' }} notMerge={false} />
         </div>
       </div>
 
       {/* 分类结果 */}
       <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 h-[400px]">
-        <ReactECharts option={getClassificationOption()} style={{ height: '100%', width: '100%' }} notMerge={false} />
+        <ReactECharts option={classificationOption} style={{ height: '100%', width: '100%' }} notMerge={false} />
       </div>
 
       {/* 特征表格 */}

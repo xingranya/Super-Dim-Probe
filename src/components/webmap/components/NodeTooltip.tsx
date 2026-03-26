@@ -1,6 +1,7 @@
 import React from 'react';
 import { Thermometer, Zap, Activity, AlertTriangle, CheckCircle, X } from 'lucide-react';
 import type { MapNode } from '@/types/map';
+import { seededRange } from '@/utils/mockMetrics';
 
 interface NodeTooltipProps {
   node: MapNode | null;
@@ -72,15 +73,18 @@ const NodeTooltip: React.FC<NodeTooltipProps> = ({
 
   // 模拟实时数据
   const mockReadings = {
-    temp: (30 + Math.random() * 20).toFixed(1),
-    pd: (Math.random() * 30).toFixed(1),
+    temp: seededRange(`${node.id}-temp`, 30, 50, 1).toFixed(1),
+    pd: seededRange(`${node.id}-pd`, 0, 30, 1).toFixed(1),
     voltage: node.voltageLevel || '110',
-    current: (100 + Math.random() * 500).toFixed(0),
+    current: seededRange(`${node.id}-current`, 100, 600, 0).toFixed(0),
   };
 
   return (
     <div
       className="fixed z-50 pointer-events-auto"
+      role="dialog"
+      aria-modal="false"
+      aria-labelledby="node-tooltip-title"
       style={{
         left: position?.x ?? '50%',
         top: position?.y ?? '50%',
@@ -89,19 +93,20 @@ const NodeTooltip: React.FC<NodeTooltipProps> = ({
     >
       <div className="bg-[#0a0f1a]/95 backdrop-blur-sm border border-[#00d4ff]/30 rounded-xl shadow-2xl shadow-cyan-500/20 w-72 overflow-hidden">
         {/* 头部 */}
-        <div className={`px-4 py-3 border-b border-${statusConfig.border} ${statusConfig.bg}`}>
+        <div className={`px-4 py-3 border-b ${statusConfig.border} ${statusConfig.bg}`}>
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-2">
               <StatusIcon size={16} style={{ color: statusConfig.color }} />
               <div>
-                <h3 className="text-white font-bold text-sm">{node.name}</h3>
+                <h3 id="node-tooltip-title" className="text-white font-bold text-sm">{node.name}</h3>
                 <p className="text-white/50 text-[10px] font-mono">{node.id.toUpperCase()}</p>
               </div>
             </div>
             {onClose && (
               <button
                 onClick={onClose}
-                className="text-white/50 hover:text-white transition-colors"
+                aria-label="关闭节点详情"
+                className="app-icon-button app-focus-dark text-white/50 hover:text-white transition-colors"
               >
                 <X size={14} />
               </button>

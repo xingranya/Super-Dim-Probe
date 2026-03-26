@@ -30,29 +30,33 @@ const LoginPage = () => {
 
         <form onSubmit={handleLogin} className="space-y-6">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">邮箱或用户名</label>
+            <label htmlFor="login-identity" className="block text-sm font-medium text-slate-700 mb-1">邮箱或用户名</label>
             <div className="relative">
               <input 
+                id="login-identity"
                 type="text" 
-                className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none transition-shadow bg-white text-slate-900" 
+                autoComplete="username"
+                className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-lg transition-shadow bg-white text-slate-900" 
                 placeholder="user@example.com"
               />
-              <User className="absolute left-3 top-3.5 text-gray-400" size={18} />
+              <User aria-hidden="true" className="absolute left-3 top-3.5 text-gray-400" size={18} />
             </div>
           </div>
           
           <div>
             <div className="flex justify-between mb-1">
-              <label className="block text-sm font-medium text-slate-700">密码</label>
-              <a href="#" className="text-xs text-brand-600 hover:underline">忘记密码?</a>
+              <label htmlFor="login-password" className="block text-sm font-medium text-slate-700">密码</label>
+              <button type="button" className="text-xs text-brand-600 hover:underline">忘记密码?</button>
             </div>
             <div className="relative">
               <input 
+                id="login-password"
                 type="password" 
-                className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none transition-shadow bg-white text-slate-900" 
+                autoComplete="current-password"
+                className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-lg transition-shadow bg-white text-slate-900" 
                 placeholder="••••••••"
               />
-              <Lock className="absolute left-3 top-3.5 text-gray-400" size={18} />
+              <Lock aria-hidden="true" className="absolute left-3 top-3.5 text-gray-400" size={18} />
             </div>
           </div>
 
@@ -91,28 +95,28 @@ const LoginPage = () => {
           </div>
 
           <div className="mt-6 grid grid-cols-4 gap-3">
-             <button className="flex flex-col items-center justify-center p-2 border border-gray-100 rounded-lg hover:bg-blue-50 hover:border-blue-200 transition-colors group">
+             <button type="button" aria-label="使用 QQ 登录" className="min-h-11 flex flex-col items-center justify-center p-2 border border-gray-100 rounded-lg hover:bg-blue-50 hover:border-blue-200 transition-colors group">
                <div className="w-8 h-8 rounded-full bg-[#12B7F5]/10 flex items-center justify-center mb-1 group-hover:bg-[#12B7F5]/20">
                  <Smile size={18} className="text-[#12B7F5]" />
                </div>
                <span className="text-xs text-slate-600">QQ</span>
              </button>
 
-             <button className="flex flex-col items-center justify-center p-2 border border-gray-100 rounded-lg hover:bg-green-50 hover:border-green-200 transition-colors group">
+             <button type="button" aria-label="使用微信登录" className="min-h-11 flex flex-col items-center justify-center p-2 border border-gray-100 rounded-lg hover:bg-green-50 hover:border-green-200 transition-colors group">
                <div className="w-8 h-8 rounded-full bg-[#07C160]/10 flex items-center justify-center mb-1 group-hover:bg-[#07C160]/20">
                  <MessageCircle size={18} className="text-[#07C160]" />
                </div>
                <span className="text-xs text-slate-600">微信</span>
              </button>
 
-             <button className="flex flex-col items-center justify-center p-2 border border-gray-100 rounded-lg hover:bg-blue-50 hover:border-blue-200 transition-colors group">
+             <button type="button" aria-label="使用支付宝登录" className="min-h-11 flex flex-col items-center justify-center p-2 border border-gray-100 rounded-lg hover:bg-blue-50 hover:border-blue-200 transition-colors group">
                <div className="w-8 h-8 rounded-full bg-[#1677FF]/10 flex items-center justify-center mb-1 group-hover:bg-[#1677FF]/20">
                  <CreditCard size={18} className="text-[#1677FF]" />
                </div>
                <span className="text-xs text-slate-600">支付宝</span>
              </button>
 
-             <button className="flex flex-col items-center justify-center p-2 border border-gray-100 rounded-lg hover:bg-brand-50 hover:border-brand-200 transition-colors group">
+             <button type="button" aria-label="使用验证码登录" className="min-h-11 flex flex-col items-center justify-center p-2 border border-gray-100 rounded-lg hover:bg-brand-50 hover:border-brand-200 transition-colors group">
                <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center mb-1 group-hover:bg-slate-200">
                  <Smartphone size={18} className="text-slate-600" />
                </div>
@@ -122,7 +126,7 @@ const LoginPage = () => {
         </div>
 
         <p className="text-center text-sm text-slate-500 mt-8">
-          还没有账号? <a href="#" className="text-brand-600 font-bold hover:underline">立即注册</a>
+          还没有账号? <button type="button" className="text-brand-600 font-bold hover:underline">立即注册</button>
         </p>
       </div>
     </div>

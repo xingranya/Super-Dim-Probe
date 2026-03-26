@@ -132,33 +132,35 @@ const SensorDashboard: React.FC<SensorDashboardProps> = ({ active = true, sensor
 const sensorInfo = SENSOR_INFO[sensorId] || { name: '未知传感器', location: '未知位置', status: 'normal' };
 
   return (
-    <div className="w-full h-screen bg-[#020617] text-white overflow-hidden font-sans selection:bg-indigo-500/30">
+    <div className="w-full min-h-screen bg-[#020617] text-white overflow-y-auto xl:h-screen xl:overflow-hidden font-sans selection:bg-indigo-500/30">
       {/* 背景光效 */}
       <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-indigo-600/20 rounded-full blur-[120px] pointer-events-none" />
       <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] bg-cyan-600/20 rounded-full blur-[120px] pointer-events-none" />
 
       {/* 顶部导航 */}
-      <header className="relative z-20 flex items-center justify-between px-8 py-6 h-[100px]">
-        <div className="flex items-center gap-6">
+      <header className="relative z-20 flex flex-col gap-4 px-4 py-5 sm:px-6 lg:px-8 xl:h-[100px] xl:flex-row xl:items-center xl:justify-between">
+        <div className="flex items-start gap-4 sm:gap-6">
           <button 
             onClick={onBack}
-            className="group p-3 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/20 transition-all duration-300 backdrop-blur-md"
+            type="button"
+            aria-label="返回上一个视图"
+            className="group app-icon-button p-3 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/20 transition-all duration-300 backdrop-blur-md app-focus-dark"
           >
             <ArrowLeft size={20} className="text-slate-300 group-hover:text-white transition-colors" />
           </button>
-          <div>
-            <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-400">
+          <div className="min-w-0">
+            <h1 className="text-2xl sm:text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-400 break-words">
               {sensorInfo.name}
             </h1>
             <div className="flex items-center gap-2 mt-1">
               <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
-              <p className="text-sm text-indigo-200/80 font-medium tracking-wide">{sensorInfo.location}</p>
+              <p className="text-sm text-indigo-200/80 font-medium tracking-wide break-words">{sensorInfo.location}</p>
             </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-6">
-          <div className={`px-4 py-1.5 rounded-full text-sm font-semibold border backdrop-blur-md flex items-center gap-2 ${
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-6">
+          <div className={`w-fit px-4 py-1.5 rounded-full text-sm font-semibold border backdrop-blur-md flex items-center gap-2 ${
             sensorInfo.status === 'normal' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' :
             sensorInfo.status === 'warning' ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' :
             'bg-red-500/10 border-red-500/20 text-red-400'
@@ -170,7 +172,7 @@ const sensorInfo = SENSOR_INFO[sensorId] || { name: '未知传感器', location:
             {sensorInfo.status === 'normal' ? '系统正常' : 
              sensorInfo.status === 'warning' ? '系统预警' : '系统故障'}
           </div>
-          <div className="text-right">
+          <div className="sm:text-right">
             <div className="text-2xl font-mono font-bold text-slate-200">
               {currentTime.toLocaleTimeString('zh-CN', { hour12: false })}
             </div>
@@ -180,10 +182,10 @@ const sensorInfo = SENSOR_INFO[sensorId] || { name: '未知传感器', location:
       </header>
 
       {/* 主内容网格 */}
-      <main className="relative z-10 px-8 pb-8 h-[calc(100vh-100px)] grid grid-cols-12 grid-rows-2 gap-6">
+      <main className="relative z-10 px-4 pb-8 sm:px-6 lg:px-8 xl:h-[calc(100vh-100px)] flex flex-col gap-6 xl:grid xl:grid-cols-12 xl:grid-rows-2">
         
         {/* 左侧：数字孪生 (3D Cross Section) */}
-        <div className="col-span-4 row-span-2 min-h-[500px]">
+        <div className="xl:col-span-4 xl:row-span-2 min-h-[360px] xl:min-h-[500px]">
           <GlassCard className="!p-0 relative group h-full">
             <div className="absolute top-6 left-6 z-20 pointer-events-none">
               <div className="flex items-center gap-2 mb-1">
@@ -228,7 +230,7 @@ const sensorInfo = SENSOR_INFO[sensorId] || { name: '未知传感器', location:
         </div>
 
         {/* 中间：核心指标 (5个维度) */}
-        <div className="col-span-5 row-span-2 grid grid-rows-3 gap-6">
+        <div className="xl:col-span-5 xl:row-span-2 grid gap-6 xl:grid-rows-3">
           {/* 1. 电学 (Voltage & Current) */}
           {/* 1. 局部放电监测 (原电学位置) */}
           {/* 1. 局部放电监测 (原电学位置) */}
@@ -264,7 +266,7 @@ const sensorInfo = SENSOR_INFO[sensorId] || { name: '未知传感器', location:
           </GlassCard>
 
           {/* 2. 磁场 & 热学 (Magnetic & Thermal) */}
-          <div className="row-span-1 grid grid-cols-2 gap-6">
+          <div className="grid gap-6 sm:grid-cols-2 xl:row-span-1">
              {/* 磁场 */}
             <GlassCard>
               <div className="flex justify-between items-start mb-2">
@@ -304,7 +306,7 @@ const sensorInfo = SENSOR_INFO[sensorId] || { name: '未知传感器', location:
           </div>
 
           {/* 3. 振动 & 声学 (Vibration & Acoustic) */}
-          <div className="row-span-1 grid grid-cols-2 gap-6">
+          <div className="grid gap-6 sm:grid-cols-2 xl:row-span-1">
             <GlassCard>
               <div className="flex items-center gap-2 mb-2">
                 <Waves size={16} className="text-cyan-400" />
@@ -338,7 +340,7 @@ const sensorInfo = SENSOR_INFO[sensorId] || { name: '未知传感器', location:
         </div>
 
         {/* 右侧：健康评估 & 详情 */}
-        <div className="col-span-3 row-span-2 grid grid-rows-[1fr_auto] gap-4">
+        <div className="xl:col-span-3 xl:row-span-2 grid gap-4 xl:grid-rows-[1fr_auto]">
           <GlassCard className="flex flex-col min-h-0 overflow-hidden">
             <div className="flex items-center gap-2 mb-2 flex-none">
               <div className="p-2 bg-emerald-500/20 rounded-lg">
@@ -457,10 +459,10 @@ const sensorInfo = SENSOR_INFO[sensorId] || { name: '未知传感器', location:
 
               {/* 3. 按钮组 (紧凑) */}
               <div className="flex items-center gap-2 pl-2 border-l border-white/5">
-                <button className="h-8 px-3 rounded bg-indigo-500/20 text-indigo-300 text-xs font-bold hover:bg-indigo-500/30 transition-colors border border-indigo-500/20">
+                <button type="button" aria-label="导出 PDF 报告" className="min-h-11 px-3 rounded bg-indigo-500/20 text-indigo-300 text-xs font-bold hover:bg-indigo-500/30 transition-colors border border-indigo-500/20 app-focus-dark">
                   PDF
                 </button>
-                <button className="h-8 px-3 rounded bg-slate-700/50 text-slate-300 text-xs font-bold hover:bg-slate-600/50 transition-colors border border-white/5">
+                <button type="button" aria-label="导出 XLS 报告" className="min-h-11 px-3 rounded bg-slate-700/50 text-slate-300 text-xs font-bold hover:bg-slate-600/50 transition-colors border border-white/5 app-focus-dark">
                   XLS
                 </button>
               </div>

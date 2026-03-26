@@ -11,6 +11,14 @@ import {
   Maximize2,
   Minimize2
 } from 'lucide-react';
+import { seededRange } from '@/utils/mockMetrics';
+import {
+  dashboardPrimaryButtonClass,
+  dashboardSecondaryButtonClass,
+  dashboardIconButtonClass,
+  dashboardTabGroupClass,
+  dashboardTabClass,
+} from './dashboardUi';
 
 /**
  * XLPE电缆综合在线监测系统页面
@@ -103,7 +111,7 @@ const XLPEMonitoringPage: React.FC = () => {
     { id: 'usr-res', type: 'user_station', name: '滨湖居住区', x: 10, y: 20, status: 'normal' },
   ];
 
-  const allNodes = [...coreNodes, ...jointNodes, ...endNodes];
+  const allNodes = useMemo(() => [...coreNodes, ...jointNodes, ...endNodes], []);
 
   // 4. 线路连接 (使用贝塞尔控制点模拟自然走向)
   const allLinks: Link[] = [
@@ -139,7 +147,14 @@ const XLPEMonitoringPage: React.FC = () => {
   ];
 
   // 辅助函数
+  const stableNodeTemps = useMemo(() => {
+    return Object.fromEntries(
+      allNodes.map((node) => [node.id, seededRange(`${node.id}-xlpe-temp`, 35, 40, 1)])
+    ) as Record<string, number>;
+  }, [allNodes]);
+
   const getNodePos = (id: string) => allNodes.find(n => n.id === id) || { x: 0, y: 0 };
+  const activeNode = useMemo(() => allNodes.find((node) => node.id === activeElement), [activeElement, allNodes]);
   
   const getPathD = (link: Link) => {
     const start = getNodePos(link.start);
@@ -167,7 +182,7 @@ const XLPEMonitoringPage: React.FC = () => {
   };
 
   return (
-    <div className={`grid grid-cols-1 lg:grid-cols-12 gap-6 ${isFullscreen ? 'fixed inset-0 z-50 bg-slate-50 p-6' : 'h-[calc(100vh-6rem)]'}`}>
+    <div className={`grid grid-cols-1 xl:grid-cols-12 gap-4 lg:gap-6 ${isFullscreen ? 'fixed inset-0 z-50 overflow-y-auto bg-slate-50 p-4 md:p-6' : 'min-h-[calc(100vh-10rem)] xl:h-[calc(100vh-6rem)]'}`}>
       {/* 左侧面板 */}
       <aside className={`lg:col-span-3 flex flex-col gap-4 overflow-y-auto pr-1 ${isFullscreen ? 'hidden' : ''}`}>
         {/* 系统概览 */}
@@ -213,7 +228,7 @@ const XLPEMonitoringPage: React.FC = () => {
               { time: '14:30:15', loc: '南区变', type: '局放预警', val: '22pC', level: 'warning' },
               { time: '12:15:00', loc: '高新园线', type: '负荷突增', val: '+25%', level: 'info' },
             ].map((evt, i) => (
-              <div key={i} className="p-3 rounded-lg bg-gray-50 border border-gray-100 hover:bg-gray-100 transition-colors cursor-pointer">
+              <button type="button" key={i} className="w-full p-3 rounded-lg bg-gray-50 border border-gray-100 hover:bg-gray-100 transition-colors text-left">
                 <div className="flex justify-between items-start mb-1">
                   <span className="font-bold text-slate-700 text-sm">{evt.loc}</span>
                   <span className="text-[10px] text-slate-400">{evt.time}</span>
@@ -222,7 +237,7 @@ const XLPEMonitoringPage: React.FC = () => {
                   <span className={`text-xs ${evt.level === 'warning' ? 'text-amber-600' : 'text-blue-600'}`}>{evt.type}</span>
                   <span className="font-mono text-xs font-medium">{evt.val}</span>
                 </div>
-              </div>
+              </button>
             ))}
           </div>
         </div>
@@ -232,39 +247,39 @@ const XLPEMonitoringPage: React.FC = () => {
       <section className={`${isFullscreen ? 'col-span-12' : 'lg:col-span-6'} flex flex-col gap-4 transition-all duration-300`}>
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-1 flex-1 flex flex-col relative overflow-hidden">
           {/* 顶部控制栏 */}
-          <div className="absolute top-4 left-4 right-4 z-10 flex justify-between items-center bg-white/90 backdrop-blur-sm p-2 rounded-lg border border-gray-200 shadow-sm pointer-events-auto">
-            <div className="flex items-center gap-3 px-2">
+          <div className="absolute top-4 left-4 right-4 z-10 flex flex-col gap-3 bg-white/90 backdrop-blur-sm p-2 rounded-lg border border-gray-200 shadow-sm pointer-events-auto lg:flex-row lg:justify-between lg:items-center">
+            <div className="flex min-w-0 items-center gap-3 px-2">
               <div className="p-1.5 bg-brand-100 rounded text-brand-600">
                 <MapIcon size={18} />
               </div>
-              <div>
+              <div className="min-w-0">
                 <h2 className="font-bold text-slate-800 text-sm">荆州核心区 110kV 电缆输电网</h2>
-                <div className="text-[10px] text-slate-500 flex gap-2">
+                <div className="text-[10px] text-slate-500 flex flex-wrap gap-2">
                   <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>在线: 42</span>
                   <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>告警: 2</span>
                 </div>
               </div>
             </div>
             
-            <div className="flex gap-2">
-              <div className="flex bg-gray-100 rounded-lg p-1 gap-1">
+            <div className="flex flex-wrap gap-2">
+              <div className={dashboardTabGroupClass}>
                 {(['normal', 'thermal', 'fault'] as const).map((mode) => (
                   <button
+                    type="button"
                     key={mode}
                     onClick={() => setViewMode(mode)}
-                    className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
-                      viewMode === mode 
-                        ? 'bg-white text-brand-600 shadow-sm' 
-                        : 'text-slate-500 hover:text-slate-700'
-                    }`}
+                    aria-pressed={viewMode === mode}
+                    className={dashboardTabClass(viewMode === mode, 'text-brand-600')}
                   >
                     {mode === 'normal' ? '标准' : mode === 'thermal' ? '热力' : '故障'}
                   </button>
                 ))}
               </div>
               <button 
+                type="button"
                 onClick={() => setIsFullscreen(!isFullscreen)}
-                className="p-2 hover:bg-gray-100 rounded-lg text-slate-500 transition-colors"
+                aria-label={isFullscreen ? '退出全屏显示' : '进入全屏显示'}
+                className={dashboardIconButtonClass}
               >
                 {isFullscreen ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
               </button>
@@ -426,14 +441,14 @@ const XLPEMonitoringPage: React.FC = () => {
                   <button onClick={() => setActiveElement(null)} className="text-slate-400 hover:text-slate-600">×</button>
                 </div>
                 
-                <div className="grid grid-cols-2 gap-3 mb-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
                   <div className="bg-slate-50 p-2 rounded">
                     <div className="text-[10px] text-slate-500">实时负荷</div>
                     <div className="font-mono font-bold text-brand-600 text-sm">{(820 * simulatedLoad).toFixed(0)} A</div>
                   </div>
                   <div className="bg-slate-50 p-2 rounded">
                     <div className="text-[10px] text-slate-500">线芯温度</div>
-                    <div className="font-mono font-bold text-orange-500 text-sm">{(45 + Math.random()*2).toFixed(1)} °C</div>
+                    <div className="font-mono font-bold text-orange-500 text-sm">{activeNode ? stableNodeTemps[activeNode.id] : '36.8'} °C</div>
                   </div>
                   <div className="bg-slate-50 p-2 rounded">
                     <div className="text-[10px] text-slate-500">局放幅值</div>
@@ -446,8 +461,8 @@ const XLPEMonitoringPage: React.FC = () => {
                 </div>
                 
                 <div className="flex gap-2">
-                  <button className="flex-1 py-1.5 bg-brand-600 text-white rounded text-xs hover:bg-brand-700 transition-colors">查看历史曲线</button>
-                  <button className="flex-1 py-1.5 bg-white border border-gray-200 text-slate-600 rounded text-xs hover:bg-gray-50 transition-colors">生成诊断报告</button>
+                  <button type="button" className={dashboardPrimaryButtonClass('flex-1 bg-brand-600 hover:bg-brand-700')}>查看历史曲线</button>
+                  <button type="button" className={`${dashboardSecondaryButtonClass} flex-1`}>生成诊断报告</button>
                 </div>
               </div>
             )}
@@ -468,10 +483,12 @@ const XLPEMonitoringPage: React.FC = () => {
           </div>
           <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1 custom-scrollbar">
             {allNodes.filter(n => n.type !== 'joint' || n.status !== 'normal').map(node => (
-              <div 
+              <button 
+                type="button"
+                aria-pressed={activeElement === node.id}
                 key={node.id}
                 onClick={() => setActiveElement(node.id)}
-                className={`flex items-center justify-between p-2.5 rounded-lg border transition-all cursor-pointer ${
+                className={`w-full text-left flex items-center justify-between p-2.5 rounded-lg border transition-all ${
                   activeElement === node.id 
                     ? 'bg-brand-50 border-brand-200 ring-1 ring-brand-200' 
                     : 'bg-white border-gray-100 hover:border-gray-300'
@@ -483,8 +500,8 @@ const XLPEMonitoringPage: React.FC = () => {
                   }`} />
                   <span className="text-xs font-medium text-slate-700">{node.name}</span>
                 </div>
-                <span className="text-[10px] font-mono text-slate-400">{(35 + Math.random()*5).toFixed(1)}°C</span>
-              </div>
+                <span className="text-[10px] font-mono text-slate-400">{stableNodeTemps[node.id]}°C</span>
+              </button>
             ))}
           </div>
         </div>
@@ -493,11 +510,11 @@ const XLPEMonitoringPage: React.FC = () => {
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
            <h2 className="font-bold text-slate-800 mb-3 text-sm">系统工具</h2>
            <div className="grid grid-cols-2 gap-2">
-             <button className="flex flex-col items-center justify-center p-3 bg-gray-50 rounded-lg hover:bg-brand-50 hover:text-brand-600 transition-colors group">
+             <button type="button" className="flex min-h-11 flex-col items-center justify-center p-3 bg-gray-50 rounded-lg hover:bg-brand-50 hover:text-brand-600 transition-colors group">
                <Settings size={20} className="text-slate-400 group-hover:text-brand-500 mb-1" />
                <span className="text-xs">参数配置</span>
              </button>
-             <button className="flex flex-col items-center justify-center p-3 bg-gray-50 rounded-lg hover:bg-brand-50 hover:text-brand-600 transition-colors group">
+             <button type="button" className="flex min-h-11 flex-col items-center justify-center p-3 bg-gray-50 rounded-lg hover:bg-brand-50 hover:text-brand-600 transition-colors group">
                <Layers size={20} className="text-slate-400 group-hover:text-brand-500 mb-1" />
                <span className="text-xs">图层管理</span>
              </button>

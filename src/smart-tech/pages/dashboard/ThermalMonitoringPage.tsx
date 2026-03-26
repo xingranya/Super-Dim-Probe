@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import ReactECharts from 'echarts-for-react';
 import * as echarts from 'echarts';
 import { 
@@ -14,6 +14,16 @@ import {
   TrendingUp,
   MapPin
 } from 'lucide-react';
+import {
+  dashboardShellClass,
+  dashboardPrimaryButtonClass,
+  dashboardSecondaryButtonClass,
+  dashboardIconButtonClass,
+  dashboardTabGroupClass,
+  dashboardToolbarClass,
+  dashboardTabClass,
+  dashboardSelectableCardClass,
+} from './dashboardUi';
 
 /**
  * 热学监测页面
@@ -42,14 +52,14 @@ const ThermalMonitoringPage: React.FC = () => {
   ];
 
   // 实时热学参数
-  const thermalParams = {
+  const thermalParams = useMemo(() => ({
     maxTemp: 58.3 + Math.random() * 2,
     minTemp: 32.5 + Math.random(),
     avgTemp: 42.8 + Math.random() * 2,
     ambientTemp: 25.5 + Math.random(),
     maxGradient: 2.8 + Math.random() * 0.5,
     hotspotCount: 2,
-  };
+  }), [tick]);
 
   // 温度分布热力图配置
   const getHeatmapOption = () => {
@@ -316,6 +326,8 @@ const ThermalMonitoringPage: React.FC = () => {
     }
   };
 
+  const chartOption = useMemo(() => getChartOption(), [viewMode, activeZone, thermalParams]);
+
   // 温度告警列表
   const thermalAlarms = [
     { time: '14:35:22', zone: '中心枢纽', type: '超温告警', value: '58.3°C', status: '未处理', level: 'warning' },
@@ -325,7 +337,7 @@ const ThermalMonitoringPage: React.FC = () => {
   ];
 
   return (
-    <div className={`grid grid-cols-1 lg:grid-cols-12 gap-6 ${isFullscreen ? 'fixed inset-0 z-50 bg-slate-50 p-6' : 'min-h-[calc(100vh-10rem)]'}`}>
+    <div className={dashboardShellClass(isFullscreen)}>
       {/* 左侧面板 - 区域监测 */}
       <aside className={`lg:col-span-3 flex flex-col gap-4 ${isFullscreen ? 'hidden' : ''}`}>
         {/* 系统状态概览 */}
@@ -362,14 +374,15 @@ const ThermalMonitoringPage: React.FC = () => {
           </h2>
           <div className="space-y-2">
             {zones.map(zone => (
-              <div
+              <button
+                type="button"
+                aria-pressed={activeZone === zone.id}
                 key={zone.id}
                 onClick={() => setActiveZone(zone.id)}
-                className={`p-3 rounded-lg border cursor-pointer transition-all ${
-                  activeZone === zone.id
-                    ? 'bg-orange-50 border-orange-200 ring-1 ring-orange-200'
-                    : 'bg-white border-gray-100 hover:border-gray-300'
-                }`}
+                className={dashboardSelectableCardClass(
+                  activeZone === zone.id,
+                  'bg-orange-50 border-orange-200 ring-1 ring-orange-200'
+                )}
               >
                 <div className="flex items-center justify-between mb-1">
                   <span className="font-medium text-slate-700 text-sm">{zone.name}</span>
@@ -391,7 +404,7 @@ const ThermalMonitoringPage: React.FC = () => {
                     style={{ width: `${Math.min(100, (zone.maxTemp / 70) * 100)}%` }}
                   />
                 </div>
-              </div>
+              </button>
             ))}
           </div>
         </div>
@@ -401,32 +414,32 @@ const ThermalMonitoringPage: React.FC = () => {
       <section className={`${isFullscreen ? 'col-span-12' : 'lg:col-span-6'} flex flex-col gap-4`}>
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-1 flex-1 flex flex-col">
           {/* 顶部控制栏 */}
-          <div className="flex justify-between items-center p-4 border-b border-gray-100">
-            <div className="flex bg-gray-100 rounded-lg p-1 gap-1">
+          <div className={dashboardToolbarClass}>
+            <div className={dashboardTabGroupClass}>
               {(['heatmap', 'trend', 'gradient'] as const).map((mode) => (
                 <button
+                  type="button"
                   key={mode}
                   onClick={() => setViewMode(mode)}
-                  className={`px-4 py-2 text-xs font-medium rounded-md transition-all ${
-                    viewMode === mode 
-                      ? 'bg-white text-orange-600 shadow-sm' 
-                      : 'text-slate-500 hover:text-slate-700'
-                  }`}
+                  aria-pressed={viewMode === mode}
+                  className={dashboardTabClass(viewMode === mode, 'text-orange-600')}
                 >
                   {mode === 'heatmap' ? '热力分布' : mode === 'trend' ? '温度趋势' : '梯度分析'}
                 </button>
               ))}
             </div>
             <div className="flex gap-2">
-              <button className="flex items-center gap-1 px-3 py-1.5 text-xs bg-orange-600 text-white rounded-lg hover:bg-orange-700">
+              <button type="button" aria-label="刷新热学监测数据" className={dashboardPrimaryButtonClass('bg-orange-600 hover:bg-orange-700')}>
                 <RefreshCw size={14} /> 刷新
               </button>
-              <button className="flex items-center gap-1 px-3 py-1.5 text-xs bg-white border border-gray-200 text-slate-600 rounded-lg hover:bg-gray-50">
+              <button type="button" aria-label="导出热学监测数据" className={dashboardSecondaryButtonClass}>
                 <Download size={14} /> 导出
               </button>
               <button 
+                type="button"
                 onClick={() => setIsFullscreen(!isFullscreen)}
-                className="p-1.5 hover:bg-gray-100 rounded-lg text-slate-500"
+                aria-label={isFullscreen ? '退出全屏显示' : '进入全屏显示'}
+                className={dashboardIconButtonClass}
               >
                 {isFullscreen ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
               </button>
@@ -436,7 +449,7 @@ const ThermalMonitoringPage: React.FC = () => {
           {/* 图表容器 */}
           <div className="flex-1 p-4 min-h-[400px]">
             <ReactECharts 
-              option={getChartOption()} 
+              option={chartOption} 
               style={{ height: '100%', width: '100%' }}
               opts={{ renderer: 'canvas' }}
               notMerge={false}
@@ -507,11 +520,11 @@ const ThermalMonitoringPage: React.FC = () => {
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
           <h2 className="font-bold text-slate-800 mb-3 text-sm">系统工具</h2>
           <div className="grid grid-cols-2 gap-2">
-            <button className="flex flex-col items-center justify-center p-3 bg-gray-50 rounded-lg hover:bg-orange-50 hover:text-orange-600 transition-colors group">
+            <button type="button" className="flex min-h-11 flex-col items-center justify-center p-3 bg-gray-50 rounded-lg hover:bg-orange-50 hover:text-orange-600 transition-colors group">
               <Settings size={20} className="text-slate-400 group-hover:text-orange-500 mb-1" />
               <span className="text-xs">阈值设置</span>
             </button>
-            <button className="flex flex-col items-center justify-center p-3 bg-gray-50 rounded-lg hover:bg-orange-50 hover:text-orange-600 transition-colors group">
+            <button type="button" className="flex min-h-11 flex-col items-center justify-center p-3 bg-gray-50 rounded-lg hover:bg-orange-50 hover:text-orange-600 transition-colors group">
               <Activity size={20} className="text-slate-400 group-hover:text-orange-500 mb-1" />
               <span className="text-xs">热分析报告</span>
             </button>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import ReactECharts from 'echarts-for-react';
 import * as echarts from 'echarts';
 import { 
@@ -14,6 +14,16 @@ import {
   BarChart3,
   Gauge
 } from 'lucide-react';
+import {
+  dashboardShellClass,
+  dashboardPrimaryButtonClass,
+  dashboardSecondaryButtonClass,
+  dashboardIconButtonClass,
+  dashboardTabGroupClass,
+  dashboardToolbarClass,
+  dashboardTabClass,
+  dashboardSelectableCardClass,
+} from './dashboardUi';
 
 /**
  * 振动监测页面
@@ -42,14 +52,14 @@ const VibrationMonitoringPage: React.FC = () => {
   ];
 
   // 实时振动参数
-  const vibrationParams = {
+  const vibrationParams = useMemo(() => ({
     rms: 5.82 + Math.random() * 0.5,
     peak: 18.5 + Math.random() * 2,
     peakToPeak: 35.2 + Math.random() * 3,
     crestFactor: 3.18 + Math.random() * 0.2,
     kurtosis: 4.25 + Math.random() * 0.3,
     skewness: 0.12 + Math.random() * 0.1,
-  };
+  }), [tick]);
 
   // 轴承特征频率配置
   const bearingFreqs = {
@@ -329,6 +339,8 @@ const VibrationMonitoringPage: React.FC = () => {
     }
   };
 
+  const chartOption = useMemo(() => getChartOption(), [viewMode, activeChannel, vibrationParams]);
+
   // 振动事件列表
   const vibrationEvents = [
     { time: '14:35:22', channel: 'VIB-02', type: '轴承磨损', severity: '中等', rms: '5.82 mm/s', level: 'warning' },
@@ -338,7 +350,7 @@ const VibrationMonitoringPage: React.FC = () => {
   ];
 
   return (
-    <div className={`grid grid-cols-1 lg:grid-cols-12 gap-6 ${isFullscreen ? 'fixed inset-0 z-50 bg-slate-50 p-6' : 'min-h-[calc(100vh-10rem)]'}`}>
+    <div className={dashboardShellClass(isFullscreen)}>
       {/* 左侧面板 - 传感器通道 */}
       <aside className={`lg:col-span-3 flex flex-col gap-4 ${isFullscreen ? 'hidden' : ''}`}>
         {/* 系统状态概览 */}
@@ -375,14 +387,15 @@ const VibrationMonitoringPage: React.FC = () => {
           </h2>
           <div className="space-y-2">
             {channels.map(channel => (
-              <div
+              <button
+                type="button"
+                aria-pressed={activeChannel === channel.id}
                 key={channel.id}
                 onClick={() => setActiveChannel(channel.id)}
-                className={`p-3 rounded-lg border cursor-pointer transition-all ${
-                  activeChannel === channel.id
-                    ? 'bg-cyan-50 border-cyan-200 ring-1 ring-cyan-200'
-                    : 'bg-white border-gray-100 hover:border-gray-300'
-                }`}
+                className={dashboardSelectableCardClass(
+                  activeChannel === channel.id,
+                  'bg-cyan-50 border-cyan-200 ring-1 ring-cyan-200'
+                )}
               >
                 <div className="flex items-center justify-between mb-1">
                   <span className="font-medium text-slate-700 text-sm">{channel.name}</span>
@@ -404,7 +417,7 @@ const VibrationMonitoringPage: React.FC = () => {
                     style={{ width: `${Math.min(100, (channel.rms / 10) * 100)}%` }}
                   />
                 </div>
-              </div>
+              </button>
             ))}
           </div>
         </div>
@@ -414,32 +427,32 @@ const VibrationMonitoringPage: React.FC = () => {
       <section className={`${isFullscreen ? 'col-span-12' : 'lg:col-span-6'} flex flex-col gap-4`}>
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-1 flex-1 flex flex-col">
           {/* 顶部控制栏 */}
-          <div className="flex justify-between items-center p-4 border-b border-gray-100">
-            <div className="flex bg-gray-100 rounded-lg p-1 gap-1">
+          <div className={dashboardToolbarClass}>
+            <div className={dashboardTabGroupClass}>
               {(['waveform', 'spectrum', 'envelope'] as const).map((mode) => (
                 <button
+                  type="button"
                   key={mode}
                   onClick={() => setViewMode(mode)}
-                  className={`px-4 py-2 text-xs font-medium rounded-md transition-all ${
-                    viewMode === mode 
-                      ? 'bg-white text-cyan-600 shadow-sm' 
-                      : 'text-slate-500 hover:text-slate-700'
-                  }`}
+                  aria-pressed={viewMode === mode}
+                  className={dashboardTabClass(viewMode === mode, 'text-cyan-600')}
                 >
                   {mode === 'waveform' ? '时域波形' : mode === 'spectrum' ? '频谱分析' : '包络谱'}
                 </button>
               ))}
             </div>
             <div className="flex gap-2">
-              <button className="flex items-center gap-1 px-3 py-1.5 text-xs bg-cyan-600 text-white rounded-lg hover:bg-cyan-700">
+              <button type="button" aria-label="刷新振动监测数据" className={dashboardPrimaryButtonClass('bg-cyan-600 hover:bg-cyan-700')}>
                 <RefreshCw size={14} /> 刷新
               </button>
-              <button className="flex items-center gap-1 px-3 py-1.5 text-xs bg-white border border-gray-200 text-slate-600 rounded-lg hover:bg-gray-50">
+              <button type="button" aria-label="导出振动监测数据" className={dashboardSecondaryButtonClass}>
                 <Download size={14} /> 导出
               </button>
               <button 
+                type="button"
                 onClick={() => setIsFullscreen(!isFullscreen)}
-                className="p-1.5 hover:bg-gray-100 rounded-lg text-slate-500"
+                aria-label={isFullscreen ? '退出全屏显示' : '进入全屏显示'}
+                className={dashboardIconButtonClass}
               >
                 {isFullscreen ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
               </button>
@@ -449,7 +462,7 @@ const VibrationMonitoringPage: React.FC = () => {
           {/* 图表容器 */}
           <div className="flex-1 p-4 min-h-[400px]">
             <ReactECharts 
-              option={getChartOption()} 
+              option={chartOption} 
               style={{ height: '100%', width: '100%' }}
               opts={{ renderer: 'canvas' }}
               notMerge={false}
@@ -544,11 +557,11 @@ const VibrationMonitoringPage: React.FC = () => {
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
           <h2 className="font-bold text-slate-800 mb-3 text-sm">系统工具</h2>
           <div className="grid grid-cols-2 gap-2">
-            <button className="flex flex-col items-center justify-center p-3 bg-gray-50 rounded-lg hover:bg-cyan-50 hover:text-cyan-600 transition-colors group">
+            <button type="button" className="flex min-h-11 flex-col items-center justify-center p-3 bg-gray-50 rounded-lg hover:bg-cyan-50 hover:text-cyan-600 transition-colors group">
               <Settings size={20} className="text-slate-400 group-hover:text-cyan-500 mb-1" />
               <span className="text-xs">阈值设置</span>
             </button>
-            <button className="flex flex-col items-center justify-center p-3 bg-gray-50 rounded-lg hover:bg-cyan-50 hover:text-cyan-600 transition-colors group">
+            <button type="button" className="flex min-h-11 flex-col items-center justify-center p-3 bg-gray-50 rounded-lg hover:bg-cyan-50 hover:text-cyan-600 transition-colors group">
               <Activity size={20} className="text-slate-400 group-hover:text-cyan-500 mb-1" />
               <span className="text-xs">诊断报告</span>
             </button>

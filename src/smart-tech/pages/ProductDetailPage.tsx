@@ -31,6 +31,7 @@ const ProductDetailPage = () => {
               <img 
                 src={product.image} 
                 alt={product.name} 
+                loading="eager"
                 className="w-full h-full object-cover" 
                 onError={(e) => {
                   const target = e.target as HTMLImageElement;
@@ -41,7 +42,7 @@ const ProductDetailPage = () => {
             <div className="grid grid-cols-4 gap-4">
               {[1, 2, 3, 4].map(i => (
                 <div key={i} className="aspect-square bg-gray-50 rounded-lg cursor-pointer hover:ring-2 ring-brand-400 overflow-hidden">
-                   <img src={`https://source.unsplash.com/random/200x200/?tech,circuit,${i}`} className="w-full h-full object-cover opacity-80 hover:opacity-100" alt="thumbnail" onError={(e) => e.currentTarget.src = `https://via.placeholder.com/200?text=View+${i}`} />
+                   <img src={`https://source.unsplash.com/random/200x200/?tech,circuit,${i}`} loading="lazy" className="w-full h-full object-cover opacity-80 hover:opacity-100" alt={`${product.name} 视图 ${i}`} onError={(e) => e.currentTarget.src = `https://via.placeholder.com/200?text=View+${i}`} />
                 </div>
               ))}
             </div>

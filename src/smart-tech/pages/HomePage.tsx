@@ -20,10 +20,11 @@ const HomePage = () => {
         <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1920&q=80')] opacity-20 bg-cover bg-center mix-blend-overlay"></div>
         <div className="container mx-auto px-4 py-24 md:py-32 relative z-10">
           <div className="max-w-3xl">
-            <h1 className="text-4xl md:text-6xl font-bold mb-6 leading-tight">
+            <p className="app-heading-kicker text-sm font-semibold text-brand-300 mb-4">SmartTech Industrial OS</p>
+            <h1 className="app-display-title text-4xl md:text-6xl font-bold mb-6">
               端侧智能的 <span className="text-brand-400">核心引擎</span>
             </h1>
-            <p className="text-lg md:text-xl text-slate-300 mb-8 max-w-2xl">
+            <p className="app-copy app-readable text-lg md:text-xl text-slate-300 mb-8 max-w-2xl">
               通过多模态传感器、AI 驱动的边缘计算和预测性分析，全面赋能您的工业基础设施，实现智能化升级。
             </p>
             <div className="flex flex-col sm:flex-row gap-4">
@@ -42,8 +43,9 @@ const HomePage = () => {
       <section className="py-20 bg-gray-50">
         <div className="container mx-auto px-4">
           <div className="text-center mb-16">
-            <h2 className="text-3xl font-bold text-slate-800 mb-4">核心能力</h2>
-            <p className="text-slate-600 max-w-2xl mx-auto">从高精度数据采集到云原生决策辅助，我们覆盖了工业物联网的全生命周期。</p>
+            <p className="app-heading-kicker text-sm font-semibold text-brand-600 mb-3">Capabilities</p>
+            <h2 className="app-display-title text-3xl font-bold text-slate-800 mb-4">核心能力</h2>
+            <p className="app-copy app-readable text-slate-600 max-w-2xl mx-auto">从高精度数据采集到云原生决策辅助，我们覆盖了工业物联网的全生命周期。</p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
             <FeatureCard 
@@ -74,8 +76,8 @@ const HomePage = () => {
       <section className="py-20 bg-white border-t border-gray-100">
         <div className="container mx-auto px-4 flex flex-col md:flex-row items-center justify-between">
           <div className="mb-8 md:mb-0">
-            <h2 className="text-3xl font-bold text-slate-800 mb-2">准备好升级您的基础设施了吗？</h2>
-            <p className="text-slate-600">加入智能电网和石化行业的领军者行列。</p>
+            <h2 className="app-display-title text-3xl font-bold text-slate-800 mb-2">准备好升级您的基础设施了吗？</h2>
+            <p className="app-copy text-slate-600">加入智能电网和石化行业的领军者行列。</p>
           </div>
           <Link to="/smart-tech/services" className="bg-slate-900 text-white px-8 py-3 rounded-lg hover:bg-slate-800 transition-shadow hover:shadow-lg">
             预约演示

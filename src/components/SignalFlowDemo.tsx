@@ -109,7 +109,13 @@ const SignalFlowDemo: React.FC<SignalFlowDemoProps> = ({
   const progressWidth = `${progress}%`;
 
   return (
-    <div ref={containerRef} className="fixed inset-0 z-50 bg-[#020508] overflow-hidden">
+    <div
+      ref={containerRef}
+      className="fixed inset-0 z-50 bg-[#020508] overflow-auto"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="signal-flow-title"
+    >
       {/* 背景网格 */}
       <div className="absolute inset-0 opacity-10" style={{
         backgroundImage: `linear-gradient(rgba(0, 243, 255, 0.1) 1px, transparent 1px),
@@ -118,22 +124,30 @@ const SignalFlowDemo: React.FC<SignalFlowDemoProps> = ({
       }} />
 
       {/* 顶部标题栏 */}
-      <div className="absolute top-0 left-0 right-0 h-12 bg-gradient-to-b from-black/90 to-transparent z-20 flex items-center justify-between px-4">
+      <div className="sticky top-0 left-0 right-0 h-12 bg-gradient-to-b from-black/90 to-transparent z-20 flex items-center justify-between px-4">
         <div className="flex items-center gap-2">
           <div className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse" />
-          <h1 className="text-white text-base font-bold">超维探缆 - 信号处理流程演示</h1>
+          <h1 id="signal-flow-title" className="text-white text-sm sm:text-base font-bold">超维探缆 - 信号处理流程演示</h1>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={() => {
-            if (progress >= 100) setProgress(0); // 如果已结束，重置进度
-            setIsPaused(prev => !prev);
-          }}
-            className="px-3 py-1 bg-slate-800/80 border border-cyan-500/30 rounded text-cyan-400 text-sm hover:bg-slate-700/80">
+          <button
+            type="button"
+            aria-label={isPaused || progress >= 100 ? '播放信号流演示' : '暂停信号流演示'}
+            onClick={() => {
+              if (progress >= 100) setProgress(0);
+              setIsPaused(prev => !prev);
+            }}
+            className="min-h-11 px-3 py-1 bg-slate-800/80 border border-cyan-500/30 rounded text-cyan-400 text-sm hover:bg-slate-700/80 app-focus-dark"
+          >
             {isPaused || progress >= 100 ? '▶ 播放' : '⏸ 暂停'}
           </button>
           {onExit && (
-            <button onClick={onExit}
-              className="px-3 py-1 bg-slate-800/80 border border-slate-600/30 rounded text-slate-400 text-sm hover:text-white">
+            <button
+              type="button"
+              aria-label="退出信号流演示"
+              onClick={onExit}
+              className="min-h-11 px-3 py-1 bg-slate-800/80 border border-slate-600/30 rounded text-slate-400 text-sm hover:text-white app-focus-dark"
+            >
               ✕ 退出
             </button>
           )}
@@ -141,13 +155,13 @@ const SignalFlowDemo: React.FC<SignalFlowDemoProps> = ({
       </div>
 
       {/* 主内容区域 */}
-      <div className="absolute inset-0 pt-12 pb-10 px-2 flex gap-2">
+      <div className="px-3 pt-4 pb-20 flex flex-col gap-3 lg:absolute lg:inset-0 lg:pt-12 lg:pb-10 lg:px-2 lg:flex-row lg:gap-2">
         {/* 左侧：传感器模型 - 使用静态图片替代3D以确保显示 */}
-        <div className="w-[22%] h-full flex flex-col rounded-lg overflow-hidden border border-cyan-500/20 bg-[#0a1628]">
+        <div className="w-full min-h-[260px] lg:w-[22%] lg:h-full flex flex-col rounded-lg overflow-hidden border border-cyan-500/20 bg-[#0a1628]">
           <div className="bg-slate-900/80 px-3 py-2 border-b border-cyan-500/20">
             <span className="text-cyan-400 text-sm font-bold">传感器阵列</span>
           </div>
-          <div className="flex-1 relative">
+          <div className="relative flex-1 min-h-[220px] lg:min-h-0">
             {/* 3D传感器场景 - 确保容器有尺寸后再渲染 */}
             {containerSize.width > 0 && (
               <ThreeScene
@@ -172,12 +186,12 @@ const SignalFlowDemo: React.FC<SignalFlowDemoProps> = ({
         </div>
 
         {/* 中间：分析流程图 */}
-        <div className="w-[50%] h-full rounded-lg overflow-hidden border border-cyan-500/20 bg-[#0a1628]">
+        <div className="w-full min-h-[320px] lg:w-[50%] lg:h-full rounded-lg overflow-hidden border border-cyan-500/20 bg-[#0a1628]">
           <AnalysisFlowChart progress={progress} isPaused={isPaused} />
         </div>
 
         {/* 右侧：结果面板 */}
-        <div className="w-[28%] h-full">
+        <div className="w-full min-h-[260px] lg:w-[28%] lg:h-full">
           <ResultPanel progress={progress} isVisible={true} />
         </div>
       </div>
@@ -196,7 +210,7 @@ const SignalFlowDemo: React.FC<SignalFlowDemoProps> = ({
       )}
 
       {/* 底部状态栏 - 统一进度显示 */}
-      <div className="absolute bottom-0 left-0 right-0 h-10 bg-gradient-to-t from-black/90 to-black/50 z-20 flex items-center px-4 gap-4">
+      <div className="fixed bottom-0 left-0 right-0 h-10 bg-gradient-to-t from-black/90 to-black/50 z-20 flex items-center px-4 gap-4">
         {/* 进度条 */}
         <div className="flex-1 h-3 bg-slate-700/80 rounded-full overflow-hidden border border-slate-600/50">
           <div

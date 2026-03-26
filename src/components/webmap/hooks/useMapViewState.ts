@@ -15,8 +15,8 @@ export function useMapViewState(initialViewState?: Partial<MapViewState>) {
     ...initialViewState,
   });
 
-  const onViewStateChange = useCallback(({ viewState: vs }: { viewState: MapViewState }) => {
-    setViewState(vs);
+  const onViewStateChange = useCallback((nextViewState: MapViewState) => {
+    setViewState(nextViewState);
   }, []);
 
   const flyTo = useCallback((target: Partial<MapViewState>, duration: number = 1000) => {

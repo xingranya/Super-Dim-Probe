@@ -7,7 +7,7 @@ export interface MapBackgroundProps {
   viewState: MapViewState;
   onViewStateChange: (viewState: MapViewState) => void;
   onLoad?: () => void;
-  onError?: (error: Error) => void;
+  onError?: (event: { error: Error }) => void;
 }
 
 export interface MapBackgroundRef {
@@ -26,8 +26,8 @@ const MapBackground = forwardRef<MapBackgroundRef, MapBackgroundProps>(
       onLoad?.();
     };
 
-    const handleError = (event: ErrorEvent) => {
-      onError?.(event.error);
+    const handleError = (event: { error: Error }) => {
+      onError?.(event);
     };
 
     return (

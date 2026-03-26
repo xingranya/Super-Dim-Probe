@@ -60,7 +60,7 @@ const DeckOverlay: React.FC<DeckOverlayProps> = ({
   return (
     <DeckGL
       viewState={viewState}
-      onViewStateChange={({ viewState: vs }) => onViewStateChange(vs as MapViewState)}
+      onViewStateChange={({ viewState: vs }) => onViewStateChange(vs as unknown as MapViewState)}
       controller={false}
       layers={layers}
       getTooltip={handleTooltip}

@@ -15,8 +15,9 @@ const ServicesPage = () => {
       {/* Header */}
       <div className="bg-slate-900 text-white py-20">
         <div className="container mx-auto px-4 text-center">
-          <h1 className="text-4xl font-bold mb-4">增值服务</h1>
-          <p className="text-slate-400 max-w-2xl mx-auto text-lg">
+          <p className="app-heading-kicker text-sm font-semibold text-brand-300 mb-4">Service Programs</p>
+          <h1 className="app-display-title text-4xl font-bold mb-4">增值服务</h1>
+          <p className="app-copy app-readable text-slate-400 max-w-2xl mx-auto text-lg">
             除了顶尖的硬件与软件，我们还提供专家级服务，确保您的业务运营获得最大成功。
           </p>
         </div>
@@ -61,7 +62,7 @@ const ServicesPage = () => {
                </blockquote>
                <div className="flex items-center gap-4 relative z-10">
                  <div className="w-12 h-12 bg-gray-600 rounded-full overflow-hidden">
-                   <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&q=80" alt="Avatar" className="w-full h-full object-cover" />
+                 <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&q=80" alt="Avatar" className="w-full h-full object-cover" />
                  </div>
                  <div>
                    <div className="font-bold">运营总监</div>
@@ -78,15 +79,15 @@ const ServicesPage = () => {
               <form className="space-y-4" onSubmit={(e) => e.preventDefault()}>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">姓名</label>
-                  <input type="text" className="w-full bg-white text-slate-900 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none" placeholder="您的姓名" />
+                  <input type="text" className="w-full bg-white text-slate-900 px-4 py-2 border border-gray-300 rounded-lg" placeholder="您的姓名" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">公司/单位</label>
-                  <input type="text" className="w-full bg-white text-slate-900 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none" placeholder="公司名称" />
+                  <input type="text" className="w-full bg-white text-slate-900 px-4 py-2 border border-gray-300 rounded-lg" placeholder="公司名称" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">感兴趣的服务</label>
-                  <select className="w-full bg-white text-slate-900 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                  <select className="w-full bg-white text-slate-900 px-4 py-2 border border-gray-300 rounded-lg">
                     <option>寿命预测服务</option>
                     <option>定制驾驶舱</option>
                     <option>年度巡检维护</option>
