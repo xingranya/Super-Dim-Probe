@@ -4,10 +4,10 @@ import { VOLTAGE_COLORS } from '@/types/map';
 import { hexToRgba, smoothEntirePath } from '../utils/geoUtils';
 
 const LINE_STYLE: Record<string, { color: string; width: number; opacity: number; glow: number }> = {
-  '220kV': { color: '#8ba9d6', width: 5.2, opacity: 248, glow: 92 },
-  '110kV': { color: '#6f96d2', width: 4.3, opacity: 240, glow: 82 },
-  '35kV': { color: '#62b785', width: 3.1, opacity: 225, glow: 62 },
-  '10kV': { color: '#d8b06a', width: 2.2, opacity: 210, glow: 48 },
+  '220kV': { color: '#9cc4ff', width: 5.8, opacity: 255, glow: 110 },
+  '110kV': { color: '#7ab0ff', width: 4.9, opacity: 252, glow: 102 },
+  '35kV': { color: '#74d59c', width: 3.6, opacity: 236, glow: 78 },
+  '10kV': { color: '#f4c36f', width: 2.7, opacity: 224, glow: 62 },
 };
 
 interface CableLayerOptions {
@@ -39,10 +39,10 @@ export function createCablePathLayer(cables: CablePath[], options?: CableLayerOp
     id: 'cable-casing',
     data: smoothedCables,
     getPath: (d) => d._smoothed,
-    getColor: [255, 255, 255, 76],
+    getColor: [255, 255, 255, 112],
     getWidth: (d) => (LINE_STYLE[d.voltageLevel] || LINE_STYLE['110kV']).width * 1.55,
-    widthMinPixels: 2.5,
-    widthMaxPixels: 12,
+    widthMinPixels: 3,
+    widthMaxPixels: 14,
     jointRounded: true,
     capRounded: true,
     pickable: false,
@@ -60,8 +60,8 @@ export function createCablePathLayer(cables: CablePath[], options?: CableLayerOp
       return hexToRgba(hex, style.glow);
     },
     getWidth: d => (LINE_STYLE[d.voltageLevel] || LINE_STYLE['110kV']).width * 1.6,
-    widthMinPixels: 2,
-    widthMaxPixels: 18,
+    widthMinPixels: 2.5,
+    widthMaxPixels: 20,
     jointRounded: true,
     capRounded: true,
     pickable: false,
@@ -82,8 +82,8 @@ export function createCablePathLayer(cables: CablePath[], options?: CableLayerOp
       return hexToRgba(hex, style.opacity);
     },
     getWidth: d => (LINE_STYLE[d.voltageLevel] || LINE_STYLE['110kV']).width,
-    widthMinPixels: 1.5,
-    widthMaxPixels: 9,
+    widthMinPixels: 2.2,
+    widthMaxPixels: 10,
     jointRounded: true,
     capRounded: true,
     pickable: true,

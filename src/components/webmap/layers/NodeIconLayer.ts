@@ -59,17 +59,24 @@ export function createRealisticNodeLayer(
   });
   layers.push(focusHaloLayer);
 
-  const iconShadowLayer = new ScatterplotLayer<MapNode>({
-    id: 'node-icon-shadow',
+  const iconBaseLayer = new ScatterplotLayer<MapNode>({
+    id: 'node-icon-base',
     data: visibleNodes,
     getPosition: d => d.position,
-    getFillColor: [11, 18, 32, 45],
-    getRadius: d => (NODE_TYPE_SIZES[d.nodeType] || 8) * 1.1,
-    radiusMinPixels: 10,
-    radiusMaxPixels: 30,
+    getFillColor: d => d.id === selectedNodeId ? [8, 14, 24, 86] : [8, 14, 24, 42],
+    getRadius: d => (NODE_TYPE_SIZES[d.nodeType] || 8) * 1.04,
+    radiusMinPixels: 12,
+    radiusMaxPixels: 28,
     pickable: false,
+    stroked: true,
+    getLineColor: d => d.id === selectedNodeId ? [255, 255, 255, 112] : [255, 255, 255, 40],
+    lineWidthMinPixels: 1,
+    updateTriggers: {
+      getFillColor: [selectedNodeId],
+      getLineColor: [selectedNodeId],
+    },
   });
-  layers.push(iconShadowLayer);
+  layers.push(iconBaseLayer);
 
   const iconLayer = new IconLayer<MapNode>({
     id: 'node-icon-main',
@@ -82,8 +89,8 @@ export function createRealisticNodeLayer(
       anchorY: 32,
     }),
     getSize: d => NODE_ICON_SIZES[d.nodeType] || 32,
-    sizeMinPixels: 26,
-    sizeMaxPixels: 74,
+    sizeMinPixels: 24,
+    sizeMaxPixels: 58,
     pickable: true,
     autoHighlight: true,
     highlightColor: [255, 255, 255, 36],
@@ -104,10 +111,10 @@ export function createRealisticNodeLayer(
     getFillColor: [0, 0, 0, 0],
     getRadius: d => {
       const base = NODE_ICON_SIZES[d.nodeType] || 24;
-      return d.nodeType === 'substation' ? base * 0.38 : base * 0.42;
+      return d.nodeType === 'substation' ? base * 0.35 : base * 0.38;
     },
-    radiusMinPixels: 9,
-    radiusMaxPixels: 24,
+    radiusMinPixels: 8,
+    radiusMaxPixels: 22,
     pickable: false,
     stroked: true,
     filled: false,
@@ -146,7 +153,8 @@ export function createRealisticNodeLayer(
       node.id === selectedNodeId ||
       node.status === 'warning' ||
       node.status === 'fault' ||
-      (zoom >= 15.2 && (node.nodeType === 'substation' || node.renderPriority === 'primary'))
+      node.nodeType === 'substation' ||
+      (zoom >= 15 && node.renderPriority === 'primary')
   );
 
   const labelLayer = new TextLayer<MapNode>({
@@ -158,11 +166,11 @@ export function createRealisticNodeLayer(
     getSize: (node) => (node.status === 'fault' || node.status === 'warning' ? 13 : 12),
     sizeMinPixels: 11,
     sizeMaxPixels: 18,
-    getPixelOffset: [0, 22],
-    getBackgroundColor: [7, 14, 24, 182],
-    backgroundPadding: [6, 4],
-    getBorderColor: [255, 255, 255, 30],
-    getBorderWidth: 1,
+    getPixelOffset: (node) => [0, node.nodeType === 'substation' ? 38 : 32],
+    getBackgroundColor: [0, 0, 0, 0],
+    backgroundPadding: [0, 0],
+    getBorderColor: [0, 0, 0, 0],
+    getBorderWidth: 0,
     billboard: true,
     pickable: false,
     characterSet: 'auto',

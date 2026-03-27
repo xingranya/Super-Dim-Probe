@@ -28,16 +28,15 @@ function createSubstationSVG(colors: typeof NODE_COLORS.substation): string {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
     <defs>
       <linearGradient id="grad-s" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stop-color="${colors.glow}" stop-opacity="0.9"/>
-        <stop offset="100%" stop-color="${colors.primary}" stop-opacity="0.95"/>
+        <stop offset="0%" stop-color="${colors.glow}" stop-opacity="1"/>
+        <stop offset="100%" stop-color="${colors.primary}" stop-opacity="1"/>
       </linearGradient>
     </defs>
-    <!-- 主体方形建筑 -->
-    <rect x="16" y="16" width="32" height="32" rx="7" fill="url(#grad-s)" stroke="${colors.stroke}" stroke-width="2"/>
-    <!-- 内部装饰线 -->
-    <rect x="20" y="20" width="24" height="24" rx="4" fill="none" stroke="${colors.stroke}" stroke-width="0.8" opacity="0.4"/>
-    <!-- ⚡ 闪电符号 -->
-    <path d="M35 18L26 34h6l-3 12 12-16h-7z" fill="white" opacity="0.95"/>
+    <!-- 主体方形建筑：保持留白，避免缩小时看起来像被截断 -->
+    <rect x="15" y="15" width="34" height="34" rx="9" fill="url(#grad-s)" stroke="${colors.stroke}" stroke-width="2"/>
+    <rect x="19" y="19" width="26" height="26" rx="6" fill="none" stroke="${colors.stroke}" stroke-width="1.2" opacity="0.32"/>
+    <!-- 中心电力符号：改为更粗、更短的闪电，缩小时仍可辨识 -->
+    <path d="M34 21L26.5 33H31L28.5 43L38 30.5H33.5L36.5 21Z" fill="white" opacity="0.98"/>
   </svg>`;
 }
 
@@ -48,8 +47,8 @@ function createJointSVG(colors: typeof NODE_COLORS.joint): string {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
     <defs>
       <radialGradient id="grad-j" cx="50%" cy="40%" r="50%">
-        <stop offset="0%" stop-color="${colors.glow}" stop-opacity="0.9"/>
-        <stop offset="100%" stop-color="${colors.primary}" stop-opacity="0.85"/>
+        <stop offset="0%" stop-color="${colors.glow}" stop-opacity="1"/>
+        <stop offset="100%" stop-color="${colors.primary}" stop-opacity="1"/>
       </radialGradient>
     </defs>
     <!-- 最外圆 -->
@@ -75,20 +74,17 @@ function createUserStationSVG(colors: typeof NODE_COLORS.user_station): string {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
     <defs>
       <linearGradient id="grad-u" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stop-color="${colors.glow}" stop-opacity="0.9"/>
-        <stop offset="100%" stop-color="${colors.primary}" stop-opacity="0.85"/>
+        <stop offset="0%" stop-color="${colors.glow}" stop-opacity="1"/>
+        <stop offset="100%" stop-color="${colors.primary}" stop-opacity="1"/>
       </linearGradient>
     </defs>
     <!-- 底座圆 -->
-    <circle cx="32" cy="32" r="18" fill="url(#grad-u)" stroke="${colors.stroke}" stroke-width="1.5"/>
-    <!-- 建筑轮廓 - 带烟囱的工厂 -->
-    <path d="M21 42V29l5-3v-5h3v3l3-2 3 2 3-2 5 3v15z" fill="white" opacity="0.88"/>
-    <!-- 窗户 -->
-    <rect x="24" y="31" width="3" height="3" rx="0.5" fill="${colors.primary}" opacity="0.7"/>
-    <rect x="31" y="31" width="3" height="3" rx="0.5" fill="${colors.primary}" opacity="0.7"/>
-    <rect x="38" y="31" width="3" height="3" rx="0.5" fill="${colors.primary}" opacity="0.7"/>
-    <!-- 门 -->
-    <rect x="29" y="37" width="6" height="5" rx="0.5" fill="${colors.primary}" opacity="0.5"/>
+    <circle cx="32" cy="32" r="16" fill="url(#grad-u)" stroke="${colors.stroke}" stroke-width="1.5"/>
+    <!-- 建筑轮廓：用高对比白色描边，避免缩小时出现“被切半”的错觉 -->
+    <path d="M23 41V29l9-7 9 7v12" fill="none" stroke="white" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" opacity="0.96"/>
+    <path d="M28.5 41v-6h7v6" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" opacity="0.92"/>
+    <line x1="27" y1="31" x2="37" y2="31" stroke="white" stroke-width="2" stroke-linecap="round" opacity="0.9"/>
+    <line x1="40.5" y1="27" x2="40.5" y2="41" stroke="white" stroke-width="2.2" stroke-linecap="round" opacity="0.92"/>
   </svg>`;
 }
 
@@ -99,8 +95,8 @@ function createGroundingSVG(colors: typeof NODE_COLORS.grounding): string {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
     <defs>
       <linearGradient id="grad-g" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stop-color="${colors.glow}" stop-opacity="0.9"/>
-        <stop offset="100%" stop-color="${colors.primary}" stop-opacity="0.85"/>
+        <stop offset="0%" stop-color="${colors.glow}" stop-opacity="1"/>
+        <stop offset="100%" stop-color="${colors.primary}" stop-opacity="1"/>
       </linearGradient>
     </defs>
     <!-- 六边形主体 -->
@@ -122,8 +118,8 @@ function createSwitchStationSVG(colors: typeof NODE_COLORS.switch_station): stri
   return `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
     <defs>
       <linearGradient id="grad-sw" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stop-color="${colors.glow}" stop-opacity="0.9"/>
-        <stop offset="100%" stop-color="${colors.primary}" stop-opacity="0.85"/>
+        <stop offset="0%" stop-color="${colors.glow}" stop-opacity="1"/>
+        <stop offset="100%" stop-color="${colors.primary}" stop-opacity="1"/>
       </linearGradient>
     </defs>
     <!-- 圆角方形主体 -->
@@ -171,10 +167,10 @@ export function getNodeIconUrl(nodeType: NodeType): string {
 /** 节点渲染尺寸配置 (像素) */
 export const NODE_ICON_SIZES: Record<NodeType, number> = {
   substation: 52,
-  switch_station: 42,
-  joint: 28,
-  user_station: 32,
-  grounding: 26,
+  switch_station: 36,
+  joint: 24,
+  user_station: 28,
+  grounding: 22,
 };
 
 // 兼容旧接口 - 保留 NODE_ICONS 导出

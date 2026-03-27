@@ -87,7 +87,7 @@ const MapHUD: React.FC<MapHUDProps> = ({
 
   return (
     <>
-      <div className="absolute top-3 left-3 z-10 pointer-events-none max-w-[min(38rem,calc(100%-5rem))]">
+      <div className="absolute top-3 left-3 z-30 pointer-events-none max-w-[min(36rem,calc(100%-5rem))]">
         <div className="app-panel-dark pointer-events-auto rounded-2xl px-3 py-2 sm:px-3.5 sm:py-2">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
             <div className="flex items-center gap-2 min-w-0">
@@ -139,7 +139,7 @@ const MapHUD: React.FC<MapHUDProps> = ({
         </div>
       </div>
 
-      <div className="absolute top-3 right-3 z-20">
+      <div className="absolute top-3 right-3 z-30">
         <button
           type="button"
           onClick={() => setPanelExpanded((current) => !current)}
@@ -155,7 +155,7 @@ const MapHUD: React.FC<MapHUDProps> = ({
       </div>
 
       <div
-        className={`absolute z-20 pointer-events-auto transition-all duration-300 ease-out ${
+        className={`absolute z-30 pointer-events-auto transition-all duration-300 ease-out ${
           panelExpanded ? 'opacity-100 translate-y-0' : 'opacity-0 pointer-events-none -translate-y-2'
         } top-16 right-3 w-[min(22rem,calc(100vw-1.5rem))] md:w-80`}
       >

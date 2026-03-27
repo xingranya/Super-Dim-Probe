@@ -120,6 +120,15 @@ textarea,
   max-width: 64ch;
 }
 
+.gis-map-shell .mapboxgl-canvas {
+  filter: saturate(0.72) brightness(0.84) contrast(0.9);
+}
+
+.gis-map-shell .mapboxgl-ctrl-bottom-left,
+.gis-map-shell .mapboxgl-ctrl-bottom-right {
+  opacity: 0.78;
+}
+
 .app-sr-only {
   position: absolute;
   width: 1px;

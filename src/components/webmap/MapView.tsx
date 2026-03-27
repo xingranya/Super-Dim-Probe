@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useMemo, useRef } from 'react';
 import Map, { MapRef } from 'react-map-gl';
 import { DeckGL } from '@deck.gl/react';
+import type { DeckGLRef } from '@deck.gl/react';
 import type { CablePath, SensorNode, MapNode, MapViewState } from '@/types/map';
 import { createCablePathLayer } from './layers/CablePathLayer';
 import { createSensorScatterLayer } from './layers/SensorScatterLayer';
@@ -26,10 +27,10 @@ export interface CableMapViewerProps {
 
 const DEFAULT_VIEW_STATE: MapViewState = {
   longitude: 112.192641,
-  latitude: 30.3388,
-  zoom: 14.7,
-  pitch: 10,
-  bearing: -8,
+  latitude: 30.3399,
+  zoom: 14.55,
+  pitch: 8,
+  bearing: -6,
 };
 
 const CableMapViewer: React.FC<CableMapViewerProps> = ({
@@ -54,8 +55,10 @@ const CableMapViewer: React.FC<CableMapViewerProps> = ({
   });
   const [selectedNode, setSelectedNode] = useState<MapNode | null>(null);
   const [tooltipPosition, setTooltipPosition] = useState<{ x: number; y: number } | undefined>(undefined);
+  const [mapCursor, setMapCursor] = useState<'default' | 'pointer'>('default');
 
   const mapRef = useRef<MapRef>(null);
+  const deckRef = useRef<DeckGLRef | null>(null);
   const mockData = useMemo(() => generateMockMapData(), []);
 
   const cables = propCables || mockData.cables;
@@ -86,6 +89,36 @@ const CableMapViewer: React.FC<CableMapViewerProps> = ({
   const handleSensorClick = useCallback((sensor: SensorNode) => {
     onSensorClick?.(sensor);
   }, [onSensorClick]);
+
+  const pickNodeAtPoint = useCallback((point?: { x: number; y: number }) => {
+    if (!point || !deckRef.current) return null;
+
+    const picked = deckRef.current.pickObject({
+      x: point.x,
+      y: point.y,
+      radius: 8,
+      layerIds: ['node-icon-main'],
+    });
+
+    return (picked?.object as MapNode | undefined) || null;
+  }, []);
+
+  const handleMapClick = useCallback((event: any) => {
+    const pickedNode = pickNodeAtPoint(event.point);
+
+    if (pickedNode) {
+      handleNodeClick(pickedNode, { x: event.point.x, y: event.point.y });
+      return;
+    }
+
+    setSelectedNode(null);
+    setTooltipPosition(undefined);
+  }, [handleNodeClick, pickNodeAtPoint]);
+
+  const handleMapMouseMove = useCallback((event: any) => {
+    const pickedNode = pickNodeAtPoint(event.point);
+    setMapCursor(pickedNode ? 'pointer' : 'default');
+  }, [pickNodeAtPoint]);
 
   const layers = useMemo(() => {
     const allLayers = [];
@@ -136,33 +169,35 @@ const CableMapViewer: React.FC<CableMapViewerProps> = ({
   }
 
   return (
-    <div className={`relative w-full h-full overflow-hidden ${className}`}>
+    <div className={`gis-map-shell relative w-full h-full overflow-hidden ${className}`}>
       <Map
         ref={mapRef}
         mapboxAccessToken={mapboxToken}
         mapStyle="mapbox://styles/mapbox/satellite-v9"
         {...viewState}
         onMove={(event) => handleViewStateChange(event.viewState as unknown as MapViewState)}
+        onClick={handleMapClick}
+        onMouseMove={handleMapMouseMove}
+        onMouseLeave={() => setMapCursor('default')}
         onLoad={handleMapLoad}
         onError={handleMapError}
         attributionControl={false}
-        style={{ width: '100%', height: '100%' }}
+        style={{ width: '100%', height: '100%', cursor: mapCursor }}
       />
 
-      <div className="absolute inset-0 pointer-events-auto">
+      <div className="absolute inset-0 z-10 pointer-events-none">
         <DeckGL
+          ref={deckRef}
           viewState={viewState}
-          onViewStateChange={({ viewState: nextState }) => handleViewStateChange(nextState as unknown as MapViewState)}
-          controller={true}
+          controller={false}
           layers={layers}
-          getCursor={({ isDragging }) => (isDragging ? 'grabbing' : 'grab')}
-          style={{ position: 'absolute', top: '0', right: '0', bottom: '0', left: '0', pointerEvents: 'auto' }}
+          style={{ position: 'absolute', top: '0', right: '0', bottom: '0', left: '0', pointerEvents: 'none' }}
         />
       </div>
 
-      <div className="pointer-events-none absolute inset-0">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_44%,rgba(7,13,23,0.02)_0%,rgba(7,13,23,0.12)_72%,rgba(3,7,18,0.22)_100%)]" />
-        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(3,10,18,0.08)_0%,rgba(3,10,18,0.01)_28%,rgba(3,10,18,0.04)_72%,rgba(3,10,18,0.10)_100%)]" />
+      <div className="pointer-events-none absolute inset-0 z-20">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_46%,rgba(6,12,20,0.03)_0%,rgba(6,12,20,0.16)_70%,rgba(3,7,18,0.28)_100%)]" />
+        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(3,10,18,0.16)_0%,rgba(3,10,18,0.03)_20%,rgba(3,10,18,0.06)_72%,rgba(3,10,18,0.15)_100%)]" />
       </div>
 
       {showHUD && (
