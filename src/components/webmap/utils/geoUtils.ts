@@ -54,41 +54,45 @@ export function getScaledWidth(baseWidth: number, zoom: number): number {
   return baseWidth * scale;
 }
 
+function isSameCoordinate(
+  pointA: [number, number] | undefined,
+  pointB: [number, number] | undefined
+): boolean {
+  if (!pointA || !pointB) return false;
+  return pointA[0] === pointB[0] && pointA[1] === pointB[1];
+}
+
+function pushUniqueCoordinate(
+  coordinates: [number, number][],
+  point: [number, number]
+) {
+  if (!isSameCoordinate(coordinates[coordinates.length - 1], point)) {
+    coordinates.push(point);
+  }
+}
+
 /**
- * 在两个坐标点之间生成贝塞尔曲线插值路径
- * 模拟电缆沿道路走向的自然弯曲
+ * 生成二次贝塞尔曲线插值
+ * 用于把折线拐点过渡成更自然的圆角
  */
-export function generateCurvedSegment(
-  p1: [number, number],
-  p2: [number, number],
-  curvature: number = 0.3,
-  segments: number = 12
+function generateQuadraticCurve(
+  start: [number, number],
+  control: [number, number],
+  end: [number, number],
+  segments: number
 ): [number, number][] {
-  const dx = p2[0] - p1[0];
-  const dy = p2[1] - p1[1];
-  const dist = Math.sqrt(dx * dx + dy * dy);
-
-  // 短距离不做曲线处理
-  if (dist < 0.001) return [p1, p2];
-
-  // 生成垂直于连线方向的控制点偏移
-  const midX = (p1[0] + p2[0]) / 2;
-  const midY = (p1[1] + p2[1]) / 2;
-
-  // 利用坐标哈希产生确定性的偏移方向，避免每次渲染结果不同
-  const hash = Math.abs(Math.sin(p1[0] * 1000 + p2[1] * 2000)) * 2 - 1;
-  const perpX = -dy * curvature * hash;
-  const perpY = dx * curvature * hash;
-
-  // 二次贝塞尔曲线控制点
-  const cpX = midX + perpX;
-  const cpY = midY + perpY;
-
   const points: [number, number][] = [];
-  for (let i = 0; i <= segments; i++) {
-    const t = i / segments;
-    const x = (1 - t) * (1 - t) * p1[0] + 2 * (1 - t) * t * cpX + t * t * p2[0];
-    const y = (1 - t) * (1 - t) * p1[1] + 2 * (1 - t) * t * cpY + t * t * p2[1];
+
+  for (let index = 0; index <= segments; index++) {
+    const t = index / segments;
+    const x =
+      (1 - t) * (1 - t) * start[0] +
+      2 * (1 - t) * t * control[0] +
+      t * t * end[0];
+    const y =
+      (1 - t) * (1 - t) * start[1] +
+      2 * (1 - t) * t * control[1] +
+      t * t * end[1];
     points.push([x, y]);
   }
 
@@ -96,29 +100,48 @@ export function generateCurvedSegment(
 }
 
 /**
- * 对整条多段路径进行曲线平滑处理
- * 将每段直线转为贝塞尔曲线，拼接成完整路径
+ * 对整条路径做折点圆角化处理
+ * 保留道路式折线走向，只柔化拐点而不是整段拉弧
  */
 export function smoothEntirePath(
   coordinates: [number, number][],
-  curvature: number = 0.2,
-  segmentsPerPair: number = 10
+  curvature: number = 0.18,
+  segmentsPerPair: number = 6
 ): [number, number][] {
-  if (coordinates.length <= 1) return coordinates;
+  if (coordinates.length <= 2) return coordinates;
 
-  const smoothed: [number, number][] = [];
-  for (let i = 0; i < coordinates.length - 1; i++) {
-    const curved = generateCurvedSegment(
-      coordinates[i],
-      coordinates[i + 1],
-      curvature,
-      segmentsPerPair
+  const smoothed: [number, number][] = [coordinates[0]];
+
+  for (let index = 1; index < coordinates.length - 1; index++) {
+    const prev = coordinates[index - 1];
+    const current = coordinates[index];
+    const next = coordinates[index + 1];
+    const incomingDistance = haversineDistance(prev, current);
+    const outgoingDistance = haversineDistance(current, next);
+    const availableRadius = Math.min(incomingDistance, outgoingDistance);
+    const roundingRadius = Math.min(
+      Math.max(availableRadius * curvature, 10),
+      68
     );
-    // 避免重复添加连接点
-    if (i > 0) curved.shift();
-    smoothed.push(...curved);
+
+    if (availableRadius < 18 || roundingRadius < 8) {
+      pushUniqueCoordinate(smoothed, current);
+      continue;
+    }
+
+    const entryPoint = movePointTowards(current, prev, roundingRadius, 0.35);
+    const exitPoint = movePointTowards(current, next, roundingRadius, 0.35);
+    const roundedCorner = generateQuadraticCurve(
+      entryPoint,
+      current,
+      exitPoint,
+      Math.max(segmentsPerPair, 3)
+    );
+
+    roundedCorner.forEach((point) => pushUniqueCoordinate(smoothed, point));
   }
 
+  pushUniqueCoordinate(smoothed, coordinates[coordinates.length - 1]);
   return smoothed;
 }
 
@@ -143,8 +166,8 @@ function movePointTowards(
 }
 
 /**
- * 对路径中的节点坐标做“留白裁切”
- * 让线缆从节点边缘出发/进入，而不是直接压过节点图标中心
+ * 仅对路径首尾端点做留白裁切
+ * 让线缆从节点边缘出发/结束，避免中间节点被裁出明显断口
  */
 export function applyNodeClearanceToPath(
   coordinates: [number, number][],
@@ -154,31 +177,19 @@ export function applyNodeClearanceToPath(
     return coordinates;
   }
 
-  const cleared: [number, number][] = [];
+  const cleared = [...coordinates];
+  const first = coordinates[0];
+  const second = coordinates[1];
+  const lastIndex = coordinates.length - 1;
+  const last = coordinates[lastIndex];
+  const beforeLast = coordinates[lastIndex - 1];
 
-  for (let index = 0; index < coordinates.length; index++) {
-    const current = coordinates[index];
-    const prev = coordinates[index - 1];
-    const next = coordinates[index + 1];
+  if (second) {
+    cleared[0] = movePointTowards(first, second, clearanceMeters, 0.28);
+  }
 
-    if (!prev && next) {
-      cleared.push(movePointTowards(current, next, clearanceMeters));
-      continue;
-    }
-
-    if (prev && !next) {
-      cleared.push(movePointTowards(current, prev, clearanceMeters));
-      continue;
-    }
-
-    if (prev && next) {
-      const incomingEdgePoint = movePointTowards(current, prev, clearanceMeters);
-      const outgoingEdgePoint = movePointTowards(current, next, clearanceMeters);
-      cleared.push(incomingEdgePoint, outgoingEdgePoint);
-      continue;
-    }
-
-    cleared.push(current);
+  if (beforeLast) {
+    cleared[lastIndex] = movePointTowards(last, beforeLast, clearanceMeters, 0.28);
   }
 
   return cleared;

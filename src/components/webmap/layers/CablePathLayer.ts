@@ -4,22 +4,36 @@ import { VOLTAGE_COLORS } from '@/types/map';
 import { applyNodeClearanceToPath, hexToRgba, smoothEntirePath } from '../utils/geoUtils';
 
 const LINE_STYLE: Record<string, { color: string; width: number; opacity: number; glow: number }> = {
-  '220kV': { color: '#9cc4ff', width: 5.8, opacity: 255, glow: 110 },
-  '110kV': { color: '#7ab0ff', width: 4.9, opacity: 252, glow: 102 },
-  '35kV': { color: '#74d59c', width: 3.6, opacity: 236, glow: 78 },
-  '10kV': { color: '#f4c36f', width: 2.7, opacity: 224, glow: 62 },
+  '220kV': { color: '#b7d3ff', width: 6.9, opacity: 228, glow: 52 },
+  '110kV': { color: '#7eb4ff', width: 5.5, opacity: 220, glow: 42 },
+  '35kV': { color: '#6fbf9c', width: 3.9, opacity: 198, glow: 24 },
+  '10kV': { color: '#b69b6d', width: 2.5, opacity: 146, glow: 10 },
 };
 
 interface CableLayerOptions {
   zoom: number;
 }
 
+const PATH_CURVATURE_BY_VOLTAGE: Record<string, number> = {
+  '220kV': 0.14,
+  '110kV': 0.15,
+  '35kV': 0.18,
+  '10kV': 0.22,
+};
+
+const PATH_SEGMENTS_BY_VOLTAGE: Record<string, number> = {
+  '220kV': 6,
+  '110kV': 6,
+  '35kV': 5,
+  '10kV': 4,
+};
+
 const NODE_CLEARANCE_BY_VOLTAGE: Record<string, number> = {
-  // 控制节点附近的线缆留白，避免在接头处形成肉眼可见的“断线”
-  '220kV': 52,
-  '110kV': 40,
-  '35kV': 30,
-  '10kV': 22,
+  // 端点轻微退让，避免直接压在节点中心
+  '220kV': 36,
+  '110kV': 28,
+  '35kV': 18,
+  '10kV': 12,
 };
 
 const isCableVisible = (cable: CablePath, zoom: number) => {
@@ -44,8 +58,8 @@ export function createCablePathLayer(cables: CablePath[], options?: CableLayerOp
         cable.coordinates,
         NODE_CLEARANCE_BY_VOLTAGE[cable.voltageLevel] || NODE_CLEARANCE_BY_VOLTAGE['110kV']
       ),
-      0.12,
-      5
+      PATH_CURVATURE_BY_VOLTAGE[cable.voltageLevel] || PATH_CURVATURE_BY_VOLTAGE['110kV'],
+      PATH_SEGMENTS_BY_VOLTAGE[cable.voltageLevel] || PATH_SEGMENTS_BY_VOLTAGE['110kV']
     ),
   }));
   const layers = [];
@@ -54,9 +68,12 @@ export function createCablePathLayer(cables: CablePath[], options?: CableLayerOp
     id: 'cable-casing',
     data: smoothedCables,
     getPath: (d) => d._smoothed,
-    getColor: [255, 255, 255, 112],
-    getWidth: (d) => (LINE_STYLE[d.voltageLevel] || LINE_STYLE['110kV']).width * 1.55,
-    widthMinPixels: 3,
+    getColor: d => {
+      const opacity = d.voltageLevel === '10kV' ? 72 : d.voltageLevel === '35kV' ? 88 : 108;
+      return [34, 48, 66, opacity] as [number, number, number, number];
+    },
+    getWidth: (d) => (LINE_STYLE[d.voltageLevel] || LINE_STYLE['110kV']).width * 1.68,
+    widthMinPixels: 3.2,
     widthMaxPixels: 14,
     jointRounded: true,
     capRounded: true,
@@ -74,9 +91,9 @@ export function createCablePathLayer(cables: CablePath[], options?: CableLayerOp
       const hex = d.color || style.color || VOLTAGE_COLORS[d.voltageLevel] || '#5c84b1';
       return hexToRgba(hex, style.glow);
     },
-    getWidth: d => (LINE_STYLE[d.voltageLevel] || LINE_STYLE['110kV']).width * 1.6,
-    widthMinPixels: 2.5,
-    widthMaxPixels: 20,
+    getWidth: d => (LINE_STYLE[d.voltageLevel] || LINE_STYLE['110kV']).width * 1.18,
+    widthMinPixels: 2.3,
+    widthMaxPixels: 13,
     jointRounded: true,
     capRounded: true,
     pickable: false,
@@ -98,12 +115,12 @@ export function createCablePathLayer(cables: CablePath[], options?: CableLayerOp
     },
     getWidth: d => (LINE_STYLE[d.voltageLevel] || LINE_STYLE['110kV']).width,
     widthMinPixels: 2.2,
-    widthMaxPixels: 10,
+    widthMaxPixels: 8,
     jointRounded: true,
     capRounded: true,
     pickable: true,
     autoHighlight: true,
-    highlightColor: [255, 255, 255, 96],
+    highlightColor: [232, 240, 255, 72],
     billboard: false,
     updateTriggers: {
       getColor: [smoothedCables.map(c => `${c.id}-${c.color || c.voltageLevel}`).join(',')],

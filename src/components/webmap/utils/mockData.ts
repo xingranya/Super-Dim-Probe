@@ -15,6 +15,10 @@ function offsetCoord(
   return [base[0] + offsetLng, base[1] + offsetLat];
 }
 
+// 基于中心点生成道路走廊拐点
+const point = (offsetLng: number, offsetLat: number): [number, number] =>
+  offsetCoord(BASE_COORDS.center, offsetLng, offsetLat);
+
 // ============ 真实网状拓扑数据 ============
 
 // 5个核心变电站 - 形成环形结构
@@ -98,55 +102,79 @@ const USER_STATIONS: MapNode[] = [
 export function generateMeshCablePaths(): CablePath[] {
   const cables: CablePath[] = [];
 
-  // 1. 主环网 - 五个核心变电站形成环形
+  // 1. 主环网 - 贴城市走廊组织，避免中心区域放射状直拉
   cables.push({
     id: 'cable-main-ring',
     name: '110kV 主环网',
     voltageLevel: '110kV',
     renderPriority: 'primary',
     coordinates: [
-      CORE_SUBSTATIONS[0].position,  // 中心站
-      RING_JOINTS[7].position,        // C1
-      RING_JOINTS[0].position,        // N1
-      CORE_SUBSTATIONS[1].position,   // 北郊站
-      RING_JOINTS[1].position,        // NE1
-      CORE_SUBSTATIONS[2].position,   // 东开发区站
-      RING_JOINTS[2].position,        // E1
-      RING_JOINTS[3].position,        // S1
-      CORE_SUBSTATIONS[3].position,   // 南部工业园站
-      RING_JOINTS[4].position,        // S2
-      RING_JOINTS[5].position,        // SW1
-      CORE_SUBSTATIONS[4].position,   // 西部新城站
-      RING_JOINTS[6].position,        // W1
-      CORE_SUBSTATIONS[0].position,   // 回到中心站
+      CORE_SUBSTATIONS[0].position,
+      point(-0.0005, 0.0013),
+      RING_JOINTS[7].position,
+      point(-0.0024, 0.0038),
+      RING_JOINTS[0].position,
+      point(-0.0060, 0.0082),
+      CORE_SUBSTATIONS[1].position,
+      point(-0.0037, 0.0078),
+      point(0.0006, 0.0073),
+      RING_JOINTS[1].position,
+      point(0.0080, 0.0054),
+      CORE_SUBSTATIONS[2].position,
+      point(0.0103, 0.0010),
+      point(0.0090, -0.0048),
+      RING_JOINTS[3].position,
+      point(0.0060, -0.0087),
+      CORE_SUBSTATIONS[3].position,
+      point(0.0018, -0.0109),
+      RING_JOINTS[4].position,
+      point(-0.0030, -0.0090),
+      RING_JOINTS[5].position,
+      point(-0.0082, -0.0060),
+      CORE_SUBSTATIONS[4].position,
+      point(-0.0090, 0.0004),
+      RING_JOINTS[6].position,
+      point(-0.0061, 0.0020),
+      point(-0.0038, 0.0014),
+      RING_JOINTS[7].position,
+      CORE_SUBSTATIONS[0].position,
     ],
   });
 
-  // 2. 东区辐射网
+  // 2. 东区辐射网 - 先沿东北走廊，再分支进入园区
   cables.push({
     id: 'cable-east-radial',
     name: '东区配电网',
     voltageLevel: '35kV',
     renderPriority: 'secondary',
     coordinates: [
-      CORE_SUBSTATIONS[2].position,  // 东开发区站
-      RING_JOINTS[2].position,        // E1
-      BRANCH_JOINTS[0].position,      // B1
-      USER_STATIONS[0].position,      // 高新科技产业园
+      CORE_SUBSTATIONS[2].position,
+      point(0.0106, 0.0034),
+      BRANCH_JOINTS[1].position,
+      point(0.0094, 0.0050),
+      point(0.0072, 0.0060),
+      BRANCH_JOINTS[0].position,
+      point(0.0096, 0.0070),
+      USER_STATIONS[0].position,
     ],
   });
 
-  // 3. 南区辐射网
+  // 3. 南区辐射网 - 贴南侧带状走廊
   cables.push({
     id: 'cable-south-radial',
     name: '南区配电网',
     voltageLevel: '35kV',
     renderPriority: 'secondary',
     coordinates: [
-      CORE_SUBSTATIONS[3].position,   // 南部工业园站
-      RING_JOINTS[3].position,        // S1
-      BRANCH_JOINTS[2].position,      // B3
-      USER_STATIONS[2].position,       // 南部工业园
+      CORE_SUBSTATIONS[3].position,
+      point(0.0044, -0.0113),
+      RING_JOINTS[4].position,
+      point(0.0012, -0.0102),
+      point(-0.0022, -0.0088),
+      BRANCH_JOINTS[2].position,
+      point(0.0014, -0.0104),
+      point(0.0046, -0.0119),
+      USER_STATIONS[2].position,
     ],
   });
 
@@ -157,7 +185,10 @@ export function generateMeshCablePaths(): CablePath[] {
     renderPriority: 'secondary',
     coordinates: [
       CORE_SUBSTATIONS[2].position,
+      point(0.0110, 0.0035),
       BRANCH_JOINTS[1].position,
+      point(0.0122, 0.0020),
+      point(0.0130, 0.0002),
       USER_STATIONS[1].position,
     ],
   });
@@ -169,38 +200,48 @@ export function generateMeshCablePaths(): CablePath[] {
     voltageLevel: '35kV',
     renderPriority: 'secondary',
     coordinates: [
-      CORE_SUBSTATIONS[4].position,   // 西部新城站
-      RING_JOINTS[6].position,        // W1
+      CORE_SUBSTATIONS[4].position,
+      point(-0.0094, -0.0006),
+      RING_JOINTS[6].position,
+      point(-0.0098, 0.0024),
       BRANCH_JOINTS[3].position,
+      point(-0.0111, 0.0062),
       USER_STATIONS[3].position,
     ],
   });
 
-  // 5. 北区辐射网
+  // 5. 北区辐射网 - 共享顶部走廊，避免再穿越中心区
   cables.push({
     id: 'cable-north-radial',
     name: '北区配电网',
     voltageLevel: '35kV',
     renderPriority: 'secondary',
     coordinates: [
-      CORE_SUBSTATIONS[1].position,   // 北郊站
-      RING_JOINTS[0].position,        // N1
+      CORE_SUBSTATIONS[1].position,
+      point(-0.0048, 0.0080),
+      RING_JOINTS[0].position,
+      point(-0.0008, 0.0074),
       BRANCH_JOINTS[0].position,
+      point(0.0088, 0.0071),
       USER_STATIONS[0].position,
     ],
   });
 
-  // 6. 中心互联线 - 少量骨干补强
+  // 6. 中心互联线 - 顺着中心东向廊道连接，不再闭合成三角形
   cables.push({
     id: 'cable-center-mesh1',
     name: '中心互联一线',
     voltageLevel: '110kV',
     renderPriority: 'primary',
     coordinates: [
-      CORE_SUBSTATIONS[0].position,  // 中心站
-      RING_JOINTS[7].position,       // C1
+      CORE_SUBSTATIONS[0].position,
+      point(0.0007, 0.0008),
+      RING_JOINTS[7].position,
+      point(0.0027, 0.0010),
+      point(0.0054, 0.0011),
       RING_JOINTS[2].position,
-      CORE_SUBSTATIONS[0].position,   // 回到中心站
+      point(0.0106, 0.0018),
+      CORE_SUBSTATIONS[2].position,
     ],
   });
 
@@ -211,24 +252,34 @@ export function generateMeshCablePaths(): CablePath[] {
     renderPriority: 'secondary',
     coordinates: [
       CORE_SUBSTATIONS[0].position,
+      point(0.0006, -0.0012),
+      point(0.0014, -0.0040),
+      point(0.0032, -0.0063),
       RING_JOINTS[3].position,
+      point(0.0059, -0.0091),
       CORE_SUBSTATIONS[3].position,
     ],
   });
 
-  // 7. 220kV电源进线
+  // 7. 220kV电源进线 - 与北向主走廊并束出线
   cables.push({
     id: 'cable-220kv-in',
     name: '220kV 电源进线',
     voltageLevel: '110kV',
     renderPriority: 'primary',
+    color: '#bfd8ff',
     coordinates: [
       CORE_SUBSTATIONS[0].position,
+      point(-0.0005, 0.0012),
+      RING_JOINTS[7].position,
+      point(-0.0024, 0.0037),
+      RING_JOINTS[0].position,
+      point(-0.0056, 0.0082),
       CORE_SUBSTATIONS[1].position,
     ],
   });
 
-  // 8. 东部联络线
+  // 8. 东部联络线 - 通过中心东廊和南向折点连接
   cables.push({
     id: 'cable-east-tie',
     name: '东区联络线',
@@ -236,12 +287,16 @@ export function generateMeshCablePaths(): CablePath[] {
     renderPriority: 'secondary',
     coordinates: [
       RING_JOINTS[2].position,
+      point(0.0066, 0.0014),
+      point(0.0038, 0.0010),
       RING_JOINTS[7].position,
+      point(0.0018, -0.0032),
+      point(0.0038, -0.0062),
       RING_JOINTS[3].position,
     ],
   });
 
-  // 9. 少量 10kV 末端线
+  // 9. 少量 10kV 末端线 - 仅作弱化的末端联络
   cables.push({
     id: 'cable-10kv-south',
     name: '用户站联络一线',
@@ -249,6 +304,8 @@ export function generateMeshCablePaths(): CablePath[] {
     renderPriority: 'tertiary',
     coordinates: [
       BRANCH_JOINTS[2].position,
+      point(-0.0024, -0.0102),
+      point(0.0020, -0.0111),
       USER_STATIONS[2].position,
     ],
   });
@@ -260,6 +317,7 @@ export function generateMeshCablePaths(): CablePath[] {
     renderPriority: 'tertiary',
     coordinates: [
       BRANCH_JOINTS[3].position,
+      point(-0.0108, 0.0061),
       USER_STATIONS[3].position,
     ],
   });
