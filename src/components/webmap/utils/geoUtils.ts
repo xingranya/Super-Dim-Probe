@@ -121,3 +121,65 @@ export function smoothEntirePath(
 
   return smoothed;
 }
+
+/**
+ * 沿两点连线方向，将起点向终点推进指定米数
+ * 用于给节点图标预留可视避让空间，避免线缆直接穿过节点中心
+ */
+function movePointTowards(
+  from: [number, number],
+  to: [number, number],
+  offsetMeters: number,
+  maxRatio: number = 0.42
+): [number, number] {
+  const segmentDistance = haversineDistance(from, to);
+  if (segmentDistance <= 0.01) return from;
+
+  const ratio = Math.min(offsetMeters / segmentDistance, maxRatio);
+  return [
+    from[0] + (to[0] - from[0]) * ratio,
+    from[1] + (to[1] - from[1]) * ratio,
+  ];
+}
+
+/**
+ * 对路径中的节点坐标做“留白裁切”
+ * 让线缆从节点边缘出发/进入，而不是直接压过节点图标中心
+ */
+export function applyNodeClearanceToPath(
+  coordinates: [number, number][],
+  clearanceMeters: number
+): [number, number][] {
+  if (coordinates.length <= 1 || clearanceMeters <= 0) {
+    return coordinates;
+  }
+
+  const cleared: [number, number][] = [];
+
+  for (let index = 0; index < coordinates.length; index++) {
+    const current = coordinates[index];
+    const prev = coordinates[index - 1];
+    const next = coordinates[index + 1];
+
+    if (!prev && next) {
+      cleared.push(movePointTowards(current, next, clearanceMeters));
+      continue;
+    }
+
+    if (prev && !next) {
+      cleared.push(movePointTowards(current, prev, clearanceMeters));
+      continue;
+    }
+
+    if (prev && next) {
+      const incomingEdgePoint = movePointTowards(current, prev, clearanceMeters);
+      const outgoingEdgePoint = movePointTowards(current, next, clearanceMeters);
+      cleared.push(incomingEdgePoint, outgoingEdgePoint);
+      continue;
+    }
+
+    cleared.push(current);
+  }
+
+  return cleared;
+}

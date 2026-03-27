@@ -15,6 +15,32 @@ interface NodeLayerOptions {
   onClick?: (node: MapNode, context?: NodeClickContext) => void;
 }
 
+const getLabelOffset = (node: MapNode, selectedNodeId?: string | null): [number, number] => {
+  if (node.id === selectedNodeId || node.nodeType === 'substation') {
+    return [30, 2];
+  }
+
+  if (node.status === 'warning' || node.status === 'fault') {
+    return [18, -18];
+  }
+
+  if (node.nodeType === 'grounding' || node.nodeType === 'joint') {
+    return [14, -16];
+  }
+
+  return [0, 28];
+};
+
+const getLabelAnchor = (node: MapNode, selectedNodeId?: string | null) => {
+  const [offsetX] = getLabelOffset(node, selectedNodeId);
+  return offsetX > 0 ? 'start' : 'middle';
+};
+
+const getLabelBaseline = (node: MapNode, selectedNodeId?: string | null) => {
+  const [, offsetY] = getLabelOffset(node, selectedNodeId);
+  return offsetY < 0 ? 'bottom' : 'center';
+};
+
 const isNodeVisible = (node: MapNode, zoom: number) => {
   if (node.status === 'warning' || node.status === 'fault') return true;
   if (node.nodeType === 'substation') return true;
@@ -82,12 +108,7 @@ export function createRealisticNodeLayer(
     id: 'node-icon-main',
     data: visibleNodes,
     getPosition: d => d.position,
-    getIcon: d => ({
-      url: getNodeIconUrl(d.nodeType),
-      width: 64,
-      height: 64,
-      anchorY: 32,
-    }),
+    getIcon: d => getNodeIconUrl(d.nodeType),
     getSize: d => NODE_ICON_SIZES[d.nodeType] || 32,
     sizeMinPixels: 24,
     sizeMaxPixels: 58,
@@ -97,6 +118,7 @@ export function createRealisticNodeLayer(
     onClick: onClick
       ? ({ object, x, y }) => object && onClick(object, { x, y })
       : undefined,
+    parameters: { depthTest: false } as any,
     updateTriggers: {
       getIcon: [visibleNodes.map(n => n.nodeType).join(',')],
       getSize: [visibleNodes.map(n => n.nodeType).join(',')],
@@ -166,16 +188,20 @@ export function createRealisticNodeLayer(
     getSize: (node) => (node.status === 'fault' || node.status === 'warning' ? 13 : 12),
     sizeMinPixels: 11,
     sizeMaxPixels: 18,
-    getPixelOffset: (node) => [0, node.nodeType === 'substation' ? 38 : 32],
-    getBackgroundColor: [0, 0, 0, 0],
-    backgroundPadding: [0, 0],
-    getBorderColor: [0, 0, 0, 0],
-    getBorderWidth: 0,
+    getPixelOffset: (node) => getLabelOffset(node, selectedNodeId),
+    getTextAnchor: (node) => getLabelAnchor(node, selectedNodeId),
+    getAlignmentBaseline: (node) => getLabelBaseline(node, selectedNodeId),
+    background: true,
+    getBackgroundColor: [7, 14, 24, 124],
+    backgroundPadding: [8, 4],
+    getBorderColor: [255, 255, 255, 18],
+    getBorderWidth: 1,
     billboard: true,
     pickable: false,
     characterSet: 'auto',
     fontFamily: 'Noto Sans SC, IBM Plex Sans, sans-serif',
     fontWeight: 600,
+    parameters: { depthTest: false } as any,
   });
   layers.push(labelLayer);
 
@@ -252,12 +278,7 @@ export function createNodeIconLayer(
     id: 'node-icons-compat',
     data: nodes,
     getPosition: d => d.position,
-    getIcon: d => ({
-      url: getNodeIconUrl(d.nodeType),
-      width: 64,
-      height: 64,
-      anchorY: 32,
-    }),
+    getIcon: d => getNodeIconUrl(d.nodeType),
     getSize: d => NODE_ICON_SIZES[d.nodeType] || 32,
     sizeMinPixels: 20,
     sizeMaxPixels: 64,
@@ -265,6 +286,7 @@ export function createNodeIconLayer(
     autoHighlight: true,
     highlightColor: [255, 255, 255, 80],
     onClick: onClick ? ({ object }) => object && onClick(object) : undefined,
+    parameters: { depthTest: false } as any,
     updateTriggers: {
       getIcon: [nodes.map(n => n.nodeType).join(',')],
     },

@@ -1,7 +1,7 @@
 import { PathLayer } from '@deck.gl/layers';
 import type { CablePath } from '@/types/map';
 import { VOLTAGE_COLORS } from '@/types/map';
-import { hexToRgba, smoothEntirePath } from '../utils/geoUtils';
+import { applyNodeClearanceToPath, hexToRgba, smoothEntirePath } from '../utils/geoUtils';
 
 const LINE_STYLE: Record<string, { color: string; width: number; opacity: number; glow: number }> = {
   '220kV': { color: '#9cc4ff', width: 5.8, opacity: 255, glow: 110 },
@@ -13,6 +13,14 @@ const LINE_STYLE: Record<string, { color: string; width: number; opacity: number
 interface CableLayerOptions {
   zoom: number;
 }
+
+const NODE_CLEARANCE_BY_VOLTAGE: Record<string, number> = {
+  // 控制节点附近的线缆留白，避免在接头处形成肉眼可见的“断线”
+  '220kV': 52,
+  '110kV': 40,
+  '35kV': 30,
+  '10kV': 22,
+};
 
 const isCableVisible = (cable: CablePath, zoom: number) => {
   const priority = cable.renderPriority || (
@@ -31,7 +39,14 @@ export function createCablePathLayer(cables: CablePath[], options?: CableLayerOp
   const visibleCables = cables.filter((cable) => isCableVisible(cable, zoom));
   const smoothedCables = visibleCables.map(cable => ({
     ...cable,
-    _smoothed: smoothEntirePath(cable.coordinates, 0.12, 5),
+    _smoothed: smoothEntirePath(
+      applyNodeClearanceToPath(
+        cable.coordinates,
+        NODE_CLEARANCE_BY_VOLTAGE[cable.voltageLevel] || NODE_CLEARANCE_BY_VOLTAGE['110kV']
+      ),
+      0.12,
+      5
+    ),
   }));
   const layers = [];
 

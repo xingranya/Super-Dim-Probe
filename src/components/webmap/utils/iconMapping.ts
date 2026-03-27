@@ -168,9 +168,9 @@ export function getNodeIconUrl(nodeType: NodeType): string {
 export const NODE_ICON_SIZES: Record<NodeType, number> = {
   substation: 52,
   switch_station: 36,
-  joint: 24,
+  joint: 30,
   user_station: 28,
-  grounding: 22,
+  grounding: 28,
 };
 
 // 兼容旧接口 - 保留 NODE_ICONS 导出

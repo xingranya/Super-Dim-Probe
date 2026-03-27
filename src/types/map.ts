@@ -102,7 +102,7 @@ export const NODE_TYPE_COLORS = {
 export const NODE_TYPE_SIZES = {
   substation: 16,       // 变电站最大
   switch_station: 12,   // 开关站中等
-  joint: 8,             // 接头中等
+  joint: 10,            // 接头中等，卫星图下适当放大增强辨识度
   user_station: 10,     // 用户站中小
-  grounding: 6,        // 接地箱最小
+  grounding: 8,         // 接地箱最小，但避免在卫星底图上过小
 } as const;
