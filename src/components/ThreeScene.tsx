@@ -554,8 +554,6 @@ const ThreeScene: React.FC<ThreeSceneProps> = ({ active = true, currentMode, isS
     
     // 六边形外壳材质
     const metalRoughness = TextureFactory.createMetalRoughnessMap();
-    metalRoughness.wrapS = THREE.RepeatWrapping;
-    metalRoughness.wrapT = THREE.RepeatWrapping;
     metalRoughness.repeat.set(2, 2);
     const hexMat = new THREE.MeshPhysicalMaterial({ 
       color: 0x141826,
