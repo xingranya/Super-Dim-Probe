@@ -14,11 +14,12 @@ interface ThreeSceneProps {
   currentMode: FaultMode;
   isScanning: boolean;
   isAutoDemo?: boolean;  // 自动演示模式
+  isScreenUnfolded?: boolean;
   onSensorUpdate: (data: SensorData) => void;
   onDemoComplete?: () => void;  // 演示完成回调
 }
 
-const ThreeScene: React.FC<ThreeSceneProps> = ({ active = true, currentMode, isScanning, isAutoDemo = false, onSensorUpdate, onDemoComplete }) => {
+const ThreeScene: React.FC<ThreeSceneProps> = ({ active = true, currentMode, isScanning, isAutoDemo = false, isScreenUnfolded = false, onSensorUpdate, onDemoComplete }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const activeRef = useRef(active);
 
@@ -31,12 +32,16 @@ const ThreeScene: React.FC<ThreeSceneProps> = ({ active = true, currentMode, isS
   // 新增：存储所有屏幕的引用
   const allScreenCanvasesRef = useRef<HTMLCanvasElement[]>([]);
   const allScreenTexturesRef = useRef<THREE.CanvasTexture[]>([]);
+  const screenMeshesRef = useRef<THREE.Mesh[]>([]);
+  const foldedPositionsRef = useRef<THREE.Vector3[]>([]);
+  const foldedQuaternionsRef = useRef<THREE.Quaternion[]>([]);
+  const foldedScalesRef = useRef<THREE.Vector3[]>([]);
   
   const frameCountRef = useRef(0);
   const lastUpdateTimeRef = useRef(0);
 
-  const propsRef = useRef({ currentMode, isScanning, isAutoDemo, onSensorUpdate, onDemoComplete });
-  useEffect(() => { propsRef.current = { currentMode, isScanning, isAutoDemo, onSensorUpdate, onDemoComplete }; }, [currentMode, isScanning, isAutoDemo, onSensorUpdate, onDemoComplete]);
+  const propsRef = useRef({ currentMode, isScanning, isAutoDemo, isScreenUnfolded, onSensorUpdate, onDemoComplete });
+  useEffect(() => { propsRef.current = { currentMode, isScanning, isAutoDemo, isScreenUnfolded, onSensorUpdate, onDemoComplete }; }, [currentMode, isScanning, isAutoDemo, isScreenUnfolded, onSensorUpdate, onDemoComplete]);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -548,12 +553,18 @@ const ThreeScene: React.FC<ThreeSceneProps> = ({ active = true, currentMode, isS
     const holeRadius = 0.20; // 中心孔半径（电缆通过）
     
     // 六边形外壳材质
+    const metalRoughness = TextureFactory.createMetalRoughnessMap();
+    metalRoughness.wrapS = THREE.RepeatWrapping;
+    metalRoughness.wrapT = THREE.RepeatWrapping;
+    metalRoughness.repeat.set(2, 2);
     const hexMat = new THREE.MeshPhysicalMaterial({ 
-      color: 0x1a1a2e,
-      roughness: 0.25,
-      metalness: 0.9,
-      clearcoat: 0.4,
-      clearcoatRoughness: 0.1
+      color: 0x141826,
+      metalness: 0.85,
+      roughness: 0.35,
+      clearcoat: 0.55,
+      clearcoatRoughness: 0.25,
+      envMapIntensity: 1.1,
+      roughnessMap: metalRoughness
     });
     
     // 创建六边形外壳（使用六边形圆柱）
@@ -562,6 +573,23 @@ const ThreeScene: React.FC<ThreeSceneProps> = ({ active = true, currentMode, isS
     const hexOuter = new THREE.Mesh(hexOuterGeo, hexMat);
     hexOuter.castShadow = true;
     sensorGroup.add(hexOuter);
+
+    const trimMat = new THREE.MeshStandardMaterial({
+      color: 0x0b0f1a,
+      metalness: 0.7,
+      roughness: 0.55,
+      emissive: new THREE.Color(0x0a2a3a),
+      emissiveIntensity: 0.08
+    });
+    const trimLen = 0.04;
+    const trimGeo = new THREE.CylinderGeometry(hexRadius * 1.01, hexRadius * 1.01, trimLen, 6, 1, false);
+    trimGeo.rotateZ(Math.PI / 2);
+    const trimA = new THREE.Mesh(trimGeo, trimMat);
+    trimA.position.x = hexLength / 2 - trimLen / 2;
+    sensorGroup.add(trimA);
+    const trimB = new THREE.Mesh(trimGeo, trimMat);
+    trimB.position.x = -hexLength / 2 + trimLen / 2;
+    sensorGroup.add(trimB);
     
     // 内部圆柱孔洞（用于视觉效果，实际电缆会穿过）
     const holeMat = new THREE.MeshStandardMaterial({ 
@@ -586,6 +614,10 @@ const ThreeScene: React.FC<ThreeSceneProps> = ({ active = true, currentMode, isS
     // 清空引用
     allScreenCanvasesRef.current = [];
     allScreenTexturesRef.current = [];
+    screenMeshesRef.current = [];
+    foldedPositionsRef.current = [];
+    foldedQuaternionsRef.current = [];
+    foldedScalesRef.current = [];
 
     for (let i = 0; i < 6; i++) {
       const face = sensorFaces[i];
@@ -631,9 +663,12 @@ const ThreeScene: React.FC<ThreeSceneProps> = ({ active = true, currentMode, isS
       // 修复屏幕内容倒置和镜像问题
       // 统一翻转所有面，确保方向一致
       screenMesh.rotateZ(Math.PI);
-      screenMesh.scale.x = -1; // 解决水平镜像
 
       sensorGroup.add(screenMesh);
+      screenMeshesRef.current[i] = screenMesh;
+      foldedPositionsRef.current[i] = screenMesh.position.clone();
+      foldedQuaternionsRef.current[i] = screenMesh.quaternion.clone();
+      foldedScalesRef.current[i] = screenMesh.scale.clone();
       
       // 边框材质 - 降低反光
       const borderMat = new THREE.MeshStandardMaterial({ 
@@ -752,6 +787,23 @@ const ThreeScene: React.FC<ThreeSceneProps> = ({ active = true, currentMode, isS
     const CAMERA_RADIUS = 3.5;                // 相机距离
     let demoStartTime = 0;                    // 演示开始时间
     let wasAutoDemo = false;                  // 上一帧是否在演示
+    let lastFrameTime = 0;
+    let unfoldProgress = 0;
+    let isWallLocked = false;
+    const lockedLocalPositions: THREE.Vector3[] = [];
+    const lockedLocalQuaternions: THREE.Quaternion[] = [];
+    const tmpSensorWorldPos = new THREE.Vector3();
+    const tmpSensorWorldQuat = new THREE.Quaternion();
+    const tmpInvSensorWorldQuat = new THREE.Quaternion();
+    const tmpDirToCamera = new THREE.Vector3();
+    const tmpWallCenter = new THREE.Vector3();
+    const tmpRight = new THREE.Vector3();
+    const tmpUp = new THREE.Vector3();
+    const tmpWorldPos = new THREE.Vector3();
+    const tmpLocalPos = new THREE.Vector3();
+    const tmpLookAtMat = new THREE.Matrix4();
+    const tmpWorldQuat = new THREE.Quaternion();
+    const tmpLocalQuat = new THREE.Quaternion();
 
     const animate = () => {
       animationId = requestAnimationFrame(animate);
@@ -759,7 +811,7 @@ const ThreeScene: React.FC<ThreeSceneProps> = ({ active = true, currentMode, isS
       if (!activeRef.current) return;
 
       const time = clock.getElapsedTime();
-      const { currentMode, isAutoDemo, onSensorUpdate } = propsRef.current;
+      const { currentMode, isAutoDemo, isScreenUnfolded, onSensorUpdate } = propsRef.current;
       frameCountRef.current++;
 
       // 自动演示模式：分步展示6个面
@@ -818,6 +870,80 @@ const ThreeScene: React.FC<ThreeSceneProps> = ({ active = true, currentMode, isS
         }
       } else {
         wasAutoDemo = false;
+      }
+
+      const delta = lastFrameTime === 0 ? 0 : (time - lastFrameTime);
+      lastFrameTime = time;
+      const unfoldTarget = isScreenUnfolded ? 1 : 0;
+      if (!isScreenUnfolded) isWallLocked = false;
+      unfoldProgress = THREE.MathUtils.damp(unfoldProgress, unfoldTarget, 8, delta);
+
+      if (screenMeshesRef.current.length === 6 && foldedPositionsRef.current.length === 6) {
+        sensorGroup.getWorldPosition(tmpSensorWorldPos);
+        sensorGroup.getWorldQuaternion(tmpSensorWorldQuat);
+        tmpInvSensorWorldQuat.copy(tmpSensorWorldQuat).invert();
+
+        tmpDirToCamera.subVectors(camera.position, tmpSensorWorldPos);
+        tmpDirToCamera.y = 0;
+        if (tmpDirToCamera.lengthSq() < 1e-8) tmpDirToCamera.set(0, 0, 1);
+        tmpDirToCamera.normalize();
+        tmpWallCenter.copy(tmpSensorWorldPos).addScaledVector(tmpDirToCamera, 1.05);
+
+        tmpUp.set(0, 1, 0);
+        tmpRight.crossVectors(tmpUp, tmpDirToCamera);
+        if (tmpRight.lengthSq() < 1e-8) tmpRight.set(1, 0, 0);
+        tmpRight.normalize();
+
+        const gapY = 0.10;
+        const stackHalfHeight = 2.5 * (screenFaceHeight + gapY);
+        const minY = -0.5 + 0.06;
+        const bottomY = tmpWallCenter.y - stackHalfHeight;
+        if (bottomY < minY) tmpWallCenter.y += (minY - bottomY);
+        const stagger = 0.06;
+        const staggerDenom = 1 - stagger * 5;
+        const shouldLockNow = unfoldTarget === 1 && !isWallLocked && unfoldProgress > 0.999;
+
+        for (let i = 0; i < 6; i++) {
+          const mesh = screenMeshesRef.current[i];
+          if (!mesh) continue;
+
+          const xOffset = 0;
+          const yOffset = (2.5 - i) * (screenFaceHeight + gapY);
+
+          tmpWorldPos.copy(tmpWallCenter)
+            .addScaledVector(tmpRight, xOffset)
+            .addScaledVector(tmpUp, yOffset);
+
+          if (isWallLocked) {
+            tmpLocalPos.copy(lockedLocalPositions[i]);
+            tmpLocalQuat.copy(lockedLocalQuaternions[i]);
+          } else {
+            tmpLookAtMat.makeBasis(tmpRight, tmpUp, tmpDirToCamera);
+            tmpWorldQuat.setFromRotationMatrix(tmpLookAtMat);
+
+            tmpLocalPos.copy(tmpWorldPos);
+            sensorGroup.worldToLocal(tmpLocalPos);
+
+            tmpLocalQuat.copy(tmpWorldQuat).premultiply(tmpInvSensorWorldQuat);
+          }
+
+          const staggerIndex = unfoldTarget === 1 ? i : 5 - i;
+          const per = THREE.MathUtils.clamp((unfoldProgress - staggerIndex * stagger) / staggerDenom, 0, 1);
+          const easedUnfold = per * per * (3 - 2 * per);
+          mesh.position.copy(foldedPositionsRef.current[i]).lerp(tmpLocalPos, easedUnfold);
+          mesh.quaternion.copy(foldedQuaternionsRef.current[i]).slerp(tmpLocalQuat, easedUnfold);
+          mesh.scale.copy(foldedScalesRef.current[i]);
+
+          if (shouldLockNow) {
+            lockedLocalPositions[i] = tmpLocalPos.clone();
+            lockedLocalQuaternions[i] = tmpLocalQuat.clone();
+          }
+        }
+
+        if (shouldLockNow) {
+          isWallLocked = true;
+          unfoldProgress = 1;
+        }
       }
 
 

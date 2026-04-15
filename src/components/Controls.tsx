@@ -6,13 +6,15 @@ interface ControlsProps {
   onModeChange: (mode: FaultMode) => void;
   onAutoDemo?: (enabled: boolean) => void;
   isAutoDemo?: boolean;  // 从外部接收演示状态（用于演示完成后同步）
+  isScreenUnfolded?: boolean;
+  onToggleScreenUnfold?: () => void;
 }
 
 /**
  * 模式选择器和自动演示控制组件
  * 自适应布局，中文界面
  */
-export const ModeSelector: React.FC<ControlsProps> = memo(({ currentMode, onModeChange, onAutoDemo, isAutoDemo = false }) => {
+export const ModeSelector: React.FC<ControlsProps> = memo(({ currentMode, onModeChange, onAutoDemo, isAutoDemo = false, isScreenUnfolded = false, onToggleScreenUnfold }) => {
   const [isCollapsed, setIsCollapsed] = React.useState(false);
 
   // 切换自动演示模式
@@ -32,6 +34,22 @@ export const ModeSelector: React.FC<ControlsProps> = memo(({ currentMode, onMode
 
       {!isCollapsed && (
         <>
+          <button
+            type="button"
+            onClick={() => onToggleScreenUnfold?.()}
+            className={`
+              px-4 py-2 rounded-lg text-sm font-bold transition-all
+              ${isScreenUnfolded
+                ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-400/60'
+                : 'bg-slate-800/80 text-slate-300 border border-slate-600/30 hover:text-white hover:border-cyan-500/50'
+              }
+            `}
+            aria-label={isScreenUnfolded ? '收起屏幕墙' : '展开屏幕墙'}
+            aria-pressed={isScreenUnfolded}
+          >
+            {isScreenUnfolded ? '▣ 收起屏幕' : '▢ 展开屏幕'}
+          </button>
+
           {/* 自动演示按钮 */}
           <button
             onClick={toggleAutoDemo}

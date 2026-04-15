@@ -48,6 +48,7 @@ const VisualizationPage: React.FC = () => {
   // 原有状态（传感器3D详情模式使用）
   const [currentMode, setCurrentMode] = useState<FaultMode>(FaultMode.XLPE_TREEING);
   const [isAutoDemo, setIsAutoDemo] = useState(false);
+  const [isScreenUnfolded, setIsScreenUnfolded] = useState(false);
   const [sensorData, setSensorData] = useState<SensorData>({ 
     pd: 0, 
     temp: 25, 
@@ -100,13 +101,15 @@ const VisualizationPage: React.FC = () => {
   // 查看传感器3D外观详情
   const handleViewSensorDetail = useCallback(() => {
     setPreviousView(viewMode);
+    setIsScreenUnfolded(false);
     setViewMode('sensorDetail');
-  }, []);
+  }, [viewMode]);
 
   // 返回上一个视图
   const handleBack = useCallback(() => {
+    if (viewMode === 'sensorDetail') setIsScreenUnfolded(false);
     setViewMode(previousView);
-  }, [previousView]);
+  }, [previousView, viewMode]);
 
   return (
     <div className="relative w-full h-screen bg-[#0f172a] overflow-hidden font-sans">
@@ -181,6 +184,7 @@ const VisualizationPage: React.FC = () => {
               currentMode={currentMode} 
               isScanning={true} 
               isAutoDemo={isAutoDemo}
+              isScreenUnfolded={isScreenUnfolded}
               onSensorUpdate={handleSensorUpdate}
               onDemoComplete={handleDemoComplete}
             />
@@ -193,6 +197,8 @@ const VisualizationPage: React.FC = () => {
             onModeChange={handleModeChange}
             onAutoDemo={handleAutoDemo}
             isAutoDemo={isAutoDemo}
+            isScreenUnfolded={isScreenUnfolded}
+            onToggleScreenUnfold={() => setIsScreenUnfolded(v => !v)}
           />
 
           {/* 返回按钮 */}
